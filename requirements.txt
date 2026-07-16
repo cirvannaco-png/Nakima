@@ -9,8 +9,8 @@ httpx==0.27.2
 
 # GitHub App auth + API client — imported by github/auth.py and
 # repository/engine.py but absent from the original requirements.txt
-PyJWT==2.9.0
-cryptography==43.0.1
+PyJWT==2.13.0
+cryptography==48.0.1
 PyGithub==2.4.0
 
 gitpython==3.1.43
