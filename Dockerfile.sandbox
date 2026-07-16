@@ -1,0 +1,5 @@
+# Image the SandboxExecutor runs generated code inside for validation
+# (format/lint/build/test). Kept minimal and network-disabled at runtime.
+FROM python:3.12-slim
+RUN pip install --no-cache-dir black flake8 pytest
+WORKDIR /workspace

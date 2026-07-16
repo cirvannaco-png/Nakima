@@ -1,2 +1,8 @@
-# Google App Engine generated folder
-appengine-generated/
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.pem
+.pytest_cache/
+*.egg-info/
