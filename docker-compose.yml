@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: nakima
+      POSTGRES_PASSWORD: nakima
+      POSTGRES_DB: nakima
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    command: uvicorn api.router:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://nakima:nakima@db:5432/nakima
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # app needs to spawn sandbox containers
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  pgdata:
