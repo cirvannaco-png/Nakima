@@ -10,11 +10,26 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nakima"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+  sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    image: nakima-sandbox:latest
+    # This service never runs standalone — SandboxExecutor launches
+    # short-lived containers from this image on demand. Building it here
+    # just makes `docker-compose build` produce it as part of one command.
+    entrypoint: ["true"]
 
   app:
     build: .
@@ -29,8 +44,12 @@ services:
       - ./:/app
       - /var/run/docker.sock:/var/run/docker.sock  # app needs to spawn sandbox containers
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      sandbox:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

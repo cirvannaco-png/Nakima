@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
+from core.limiter import limiter
 from githubapp.auth import GitHubAppAuthError, github_auth
 from githubapp.webhooks import verify_webhook
 from orchestrator.workflow import WorkflowOrchestrator
@@ -13,6 +14,7 @@ EVENTS_OF_INTEREST = {"issues", "pull_request", "push"}
 
 
 @router.post("/webhook")
+@limiter.limit("60/minute")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     event = await verify_webhook(request)
 

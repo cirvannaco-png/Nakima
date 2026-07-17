@@ -10,6 +10,9 @@ from database.base import Base
 # Import all models so Base.metadata is fully populated for autogenerate.
 from models.repository import Repository  # noqa: F401
 from models.task import Task  # noqa: F401
+from models.graph import GraphNode, GraphEdge  # noqa: F401
+from models.knowledge import KnowledgeNode, KnowledgeEdge  # noqa: F401
+from models.policy import RepositoryPolicy  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
