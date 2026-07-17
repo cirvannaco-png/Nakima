@@ -20,11 +20,20 @@ class ImplementationAgent(BaseAgent):
         and apply them. Returns the list of touched file paths."""
         repo_dir = Path(context["repo_dir"])
         plan = params["plan"]
+        extra_context = params.get("extra_context")
 
-        response = await self.provider.generate(
-            f"Implement the following plan:\n{plan}",
-            {"repo_dir": str(repo_dir)},
-        )
+        prompt = f"Implement the following plan:\n{plan}"
+        if extra_context:
+            snippets = "\n\n".join(
+                f"### {s['file']}\n```\n{s['content']}\n```" for s in extra_context.get("code_snippets", [])
+            )
+            if snippets:
+                prompt += f"\n\nRelevant existing code:\n{snippets}"
+            dep_graph = extra_context.get("dependency_subgraph")
+            if dep_graph:
+                prompt += f"\n\nDependency relationships for affected files:\n{dep_graph}"
+
+        response = await self.provider.generate(prompt, {"repo_dir": str(repo_dir)})
 
         changes = parse_file_blocks(response.content)
         if not changes:

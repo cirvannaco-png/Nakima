@@ -24,3 +24,10 @@ tree-sitter-languages==1.10.2
 opentelemetry-api==1.27.0
 opentelemetry-sdk==1.27.0
 prometheus-client==0.20.0
+
+# v2 subsystems — used by repository/graph_builder.py, repository/health.py,
+# and api/router.py's rate limiting respectively. Missing from the original
+# v2.1/v2.3 requirements.txt despite being imported.
+networkx==3.3
+radon==6.0.1
+slowapi==0.1.9
