@@ -108,4 +108,23 @@ class GitHubAppAuth:
         return data["token"]
 
 
-github_auth = GitHubAppAuth()
+class _LazyGitHubAppAuth:
+    """Defer GitHubAppAuth() construction until the first attribute access.
+
+    Importing this module used to instantiate GitHubAppAuth() at import time,
+    which fails hard when GITHUB_APP_ID or the private key are unset — that
+    made `from githubapp.app import router` (and therefore `create_app()`)
+    impossible to import in tests, CI, or before the app is fully configured.
+    """
+    _inner = None
+
+    def _get(self):
+        if self._inner is None:
+            self._inner = GitHubAppAuth()
+        return self._inner
+
+    def __getattr__(self, name):
+        return getattr(self._get(), name)
+
+
+github_auth = _LazyGitHubAppAuth()
