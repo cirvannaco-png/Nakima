@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_URL: str | None = None
 
-    # GitHub App
+    # GitHub App (webhook / PR automation)
     # A GitHub App private key comes from GitHub as a downloaded .pem file (PKCS#1 RSA).
     # Provide EITHER the raw PEM contents (GITHUB_PRIVATE_KEY) OR a path to the .pem file
     # (GITHUB_PRIVATE_KEY_PATH). The path is easier to manage in most deployments.
@@ -33,9 +33,21 @@ class Settings(BaseSettings):
     GITHUB_WEBHOOK_SECRET: str = ""
 
     # AI Providers
-    DEFAULT_AI_PROVIDER: str = "claude"
+    # Default: GitHub Models (free, no separate account, uses a GitHub PAT).
+    DEFAULT_AI_PROVIDER: str = "github"
     PROVIDER_MAX_RETRIES: int = 3
     PROVIDER_TIMEOUT: int = 300
+
+    # GitHub Models — free inference via https://models.github.ai/inference.
+    # Create a fine-grained PAT with "Models: read" at
+    # https://github.com/settings/personal-access-tokens/new and set it as
+    # GITHUB_TOKEN. GITHUB_MODELS_TOKEN can override it if you want to use a
+    # different token for inference than for repo automation.
+    GITHUB_TOKEN: Optional[str] = None
+    GITHUB_MODELS_TOKEN: Optional[str] = None
+    GITHUB_MODELS_MODEL: str = "openai/gpt-4o-mini"
+
+    # Optional paid providers.
     ANTHROPIC_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None

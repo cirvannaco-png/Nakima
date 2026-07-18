@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 os.environ.setdefault("GITHUB_APP_ID", "123456")
 os.environ.setdefault("GITHUB_WEBHOOK_SECRET", "testsecret")
-os.environ.setdefault("ANTHROPIC_API_KEY", "sk-test")
+os.environ.setdefault("GITHUB_TOKEN", "ghp-test")
+os.environ.setdefault("DEFAULT_AI_PROVIDER", "github")
 
 
 @pytest.fixture

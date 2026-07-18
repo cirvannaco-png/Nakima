@@ -16,11 +16,12 @@ class ProviderManager:
 
     def _load_providers(self):
         provider_map = {
+            # Default: free, OpenAI-compatible, auth via GITHUB_TOKEN.
+            "github": "providers.implementations.github_models.GitHubModelsProvider",
+            # Optional paid providers — enabled only when their API key is set.
             "claude": "providers.implementations.claude.ClaudeProvider",
             # codex, copilot, deepseek, replit follow the same AIProvider
-            # interface as ClaudeProvider — add their modules here once
-            # implemented; unimplemented providers are skipped with a warning
-            # rather than crashing the whole manager.
+            # interface — add their modules here once implemented.
         }
         for name, class_path in provider_map.items():
             try:
