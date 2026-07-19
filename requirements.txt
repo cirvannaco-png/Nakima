@@ -36,3 +36,9 @@ slowapi==0.1.9
 # string comparison, which breaks on "2.9.0" vs "2.10.0" (string-sorts
 # "2.10.0" before "2.9.0").
 packaging==24.1
+
+# Engineering Intelligence Report PDF generation (reports/pdf_generator.py).
+# Pure Python, no system libraries required (unlike WeasyPrint's
+# libcairo/pango dependency) — matters for the same minimal-deploy-target
+# reasons already documented around SANDBOX_IMAGE and Cirvanna's GCE choice.
+reportlab==4.2.5

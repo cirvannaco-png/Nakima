@@ -21,5 +21,5 @@ async def get_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):  # n
         "pr_url": task.pr_url,
         "error": task.error,
         "created_at": task.created_at.isoformat(),
-        "updated_at": task.updated_at.isoformat(),
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
     }

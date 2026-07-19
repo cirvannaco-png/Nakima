@@ -1,0 +1,200 @@
+"""Nakima Security Intelligence Layer — the orchestrator from the EIP
+spec's NSIL proposal. Runs Secret Detection and Configuration Security
+locally (pure Python, no sandbox needed — see security/secret_scanner.py
+and security/config_scanner.py), and SAST + Dependency Audit via
+SecurityAgent (which needs Docker; see agents/security_agent.py). Persists
+every finding with a stable fingerprint so re-scans can tell "still open"
+apart from "newly resolved" instead of treating each scan as an unrelated
+snapshot — this is the Security Regression Testing concept from the spec.
+
+What this deliberately does not do: Dynamic Security Testing (DAST) or the
+Penetration Testing Simulator. Both need something to actually execute the
+target application against, and nothing in Nakima's pipeline runs a
+target app today (the sandbox executes tests/builds, not a live server) —
+building that is a materially bigger, separate piece of work, not an
+extension of what's here.
+"""
+
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from agents.base import AgentRequest
+from agents.security_agent import SecurityAgent
+from models.security import SecurityFinding, fingerprint
+from security.config_scanner import ConfigSecurityScanner
+from security.risk_scoring import RiskScorer
+from security.secret_scanner import SecretScanner
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class NSILResult:
+    score: float
+    counts_by_severity: dict[str, int]
+    total_open: int
+    new_finding_count: int
+    resolved_finding_count: int
+    scanners_run: list[str] = field(default_factory=list)
+    scanners_skipped: list[str] = field(default_factory=list)
+
+
+class SecurityIntelligenceLayer:
+    def __init__(self, session: AsyncSession, repository_id: int):
+        self.session = session
+        self.repository_id = repository_id
+        self.risk_scorer = RiskScorer()
+
+    async def scan(self, repo_dir: Path) -> NSILResult:
+        repo_dir = Path(repo_dir)
+        scanners_run: list[str] = []
+        scanners_skipped: list[str] = []
+
+        current: dict[str, dict] = {}  # fingerprint -> finding dict
+
+        for secret_finding in SecretScanner().scan(repo_dir):
+            fp = fingerprint("secret", secret_finding.pattern_name, secret_finding.file_path, secret_finding.line_number)
+            current[fp] = {
+                "source": "secret",
+                "rule": secret_finding.pattern_name,
+                "severity": secret_finding.severity,
+                "file_path": secret_finding.file_path,
+                "line_number": secret_finding.line_number,
+                "detail": f"Possible secret ({secret_finding.pattern_name}): {secret_finding.redacted_preview}",
+            }
+        scanners_run.append("secret_detection")
+
+        for config_finding in ConfigSecurityScanner().scan(repo_dir):
+            fp = fingerprint("config", config_finding.rule, config_finding.file_path, None)
+            current[fp] = {
+                "source": "config",
+                "rule": config_finding.rule,
+                "severity": config_finding.severity,
+                "file_path": config_finding.file_path,
+                "line_number": None,
+                "detail": config_finding.detail,
+            }
+        scanners_run.append("config_security")
+
+        try:
+            agent = SecurityAgent()
+        except Exception as e:
+            logger.warning(f"NSIL: no AI provider configured, skipping agent-backed scanners: {e}")
+            agent = None
+            scanners_skipped.extend(["sast", "dependency_audit"])
+
+        if agent is not None:
+            for source, action, mapper in (
+                ("sast", "sast_scan", self._map_sast_finding),
+                ("dependency_audit", "audit_dependencies", self._map_dependency_finding),
+            ):
+                try:
+                    resp = await agent.execute(AgentRequest(action=action, context={"repo_dir": str(repo_dir)}))
+                    if resp.success:
+                        for item in mapper(resp.result):
+                            fp = fingerprint(source, item["rule"], item["file_path"], item.get("line_number"))
+                            current[fp] = {"source": source, **item}
+                        scanners_run.append(source)
+                    else:
+                        scanners_skipped.append(source)
+                except Exception as e:
+                    # Most commonly: no Docker daemon available in this
+                    # environment. A missing scanner degrades the result
+                    # rather than failing the whole NSIL run — same
+                    # philosophy as CognitiveEngine's provider fallback.
+                    logger.warning(f"NSIL: {source} scan failed, skipping: {e}")
+                    scanners_skipped.append(source)
+
+        new_count, resolved_count = await self._reconcile(current)
+
+        open_severities = [f.severity for f in await self._open_findings()]
+        risk = self.risk_scorer.score(open_severities)
+
+        return NSILResult(
+            score=risk.score,
+            counts_by_severity=risk.counts_by_severity,
+            total_open=risk.total_findings,
+            new_finding_count=new_count,
+            resolved_finding_count=resolved_count,
+            scanners_run=scanners_run,
+            scanners_skipped=scanners_skipped,
+        )
+
+    def _map_sast_finding(self, result: dict) -> list[dict]:
+        return [
+            {
+                "rule": f["rule"] or "unknown",
+                "severity": f["severity"] if f["severity"] in ("critical", "high", "medium", "low") else "medium",
+                "file_path": f["file"],
+                "line_number": f.get("line"),
+                "detail": f"{f.get('title', '')}: {f.get('detail', '')}".strip(": "),
+            }
+            for f in result.get("findings", [])
+        ]
+
+    def _map_dependency_finding(self, result: dict) -> list[dict]:
+        return [
+            {
+                "rule": v.get("vulnerability", "unknown"),
+                "severity": "high",  # `safety`'s free-tier output doesn't carry a severity field
+                "file_path": "requirements.txt",
+                "line_number": None,
+                "detail": f"{v.get('package')} {v.get('installed')}: {v.get('vulnerability')}",
+            }
+            for v in result.get("vulnerabilities", [])
+        ]
+
+    async def _open_findings(self) -> list[SecurityFinding]:
+        stmt = select(SecurityFinding).where(
+            SecurityFinding.repository_id == self.repository_id, SecurityFinding.status == "open"
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def _reconcile(self, current: dict[str, dict]) -> tuple[int, int]:
+        """Diffs `current` (this scan's fingerprints) against what's
+        already stored as open in the DB. New fingerprints are inserted;
+        fingerprints seen before get last_seen_at bumped (and are reopened
+        if they'd been marked resolved); previously-open fingerprints not
+        seen this time are marked resolved. Returns (new_count,
+        resolved_count).
+        """
+        stmt = select(SecurityFinding).where(SecurityFinding.repository_id == self.repository_id)
+        existing = {f.fingerprint: f for f in (await self.session.execute(stmt)).scalars().all()}
+
+        now = datetime.utcnow()
+        new_count = 0
+
+        for fp, data in current.items():
+            row = existing.get(fp)
+            if row is None:
+                self.session.add(
+                    SecurityFinding(
+                        repository_id=self.repository_id,
+                        fingerprint=fp,
+                        first_seen_at=now,
+                        last_seen_at=now,
+                        status="open",
+                        **data,
+                    )
+                )
+                new_count += 1
+            else:
+                row.last_seen_at = now
+                if row.status == "resolved":
+                    row.status = "open"
+                    row.resolved_at = None
+
+        resolved_count = 0
+        for fp, row in existing.items():
+            if fp not in current and row.status == "open":
+                row.status = "resolved"
+                row.resolved_at = now
+                resolved_count += 1
+
+        await self.session.commit()
+        return new_count, resolved_count

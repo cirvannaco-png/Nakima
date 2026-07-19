@@ -2,51 +2,39 @@
 
 Network calls are mocked — we only verify the provider builds the request
 correctly and surfaces a clean error when the token is missing.
-"""
 
-import os
+Uses monkeypatch.setattr on the core.config.settings singleton's fields,
+not importlib.reload(core.config) — reload() replaces the module's
+Settings/PreflightError classes with new objects, so any test module that
+imported the old classes earlier in the session (pytest collects all test
+modules before running any of them) ends up holding a stale reference that
+`isinstance` no longer recognizes, silently breaking `pytest.raises(...)`
+in unrelated test files. monkeypatch reverts attribute changes
+automatically after each test, so no manual os.environ restoration is
+needed either.
+"""
 
 import httpx
 import pytest
 
+from core.config import settings
+from providers.implementations import github_models as gm_mod
+
 
 @pytest.mark.asyncio
-async def test_missing_token_raises():
-    # Ensure a clean env for this test only.
-    old_token = os.environ.pop("GITHUB_TOKEN", None)
-    old_models_token = os.environ.pop("GITHUB_MODELS_TOKEN", None)
-    try:
-        # Re-import settings with the cleaned env.
-        from importlib import reload
+async def test_missing_token_raises(monkeypatch):
+    monkeypatch.setattr(settings, "GITHUB_TOKEN", None)
+    monkeypatch.setattr(settings, "GITHUB_MODELS_TOKEN", None)
 
-        from core import config as config_mod
-
-        reload(config_mod)
-        from providers.implementations import github_models as gm_mod
-
-        reload(gm_mod)
-
-        provider = gm_mod.GitHubModelsProvider()
-        with pytest.raises(RuntimeError, match="GITHUB_TOKEN"):
-            await provider._call("hello")
-    finally:
-        if old_token is not None:
-            os.environ["GITHUB_TOKEN"] = old_token
-        if old_models_token is not None:
-            os.environ["GITHUB_MODELS_TOKEN"] = old_models_token
+    provider = gm_mod.GitHubModelsProvider()
+    with pytest.raises(RuntimeError, match="GITHUB_TOKEN"):
+        await provider._call("hello")
 
 
 @pytest.mark.asyncio
 async def test_call_builds_openai_shaped_request(monkeypatch):
-    os.environ["GITHUB_TOKEN"] = "ghp-test-token"
-    from importlib import reload
-
-    from core import config as config_mod
-
-    reload(config_mod)
-    from providers.implementations import github_models as gm_mod
-
-    reload(gm_mod)
+    monkeypatch.setattr(settings, "GITHUB_TOKEN", "ghp-test-token")
+    monkeypatch.setattr(settings, "GITHUB_MODELS_TOKEN", None)
 
     captured = {}
 

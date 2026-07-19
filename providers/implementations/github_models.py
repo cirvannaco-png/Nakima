@@ -63,7 +63,7 @@ class GitHubModelsProvider(AIProvider):
                 GITHUB_MODELS_URL,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Accept": "application/vnd.github+json",
+                    "Accept": "application/json",
                     "Content-Type": "application/json",
                 },
                 json={

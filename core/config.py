@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     NEIS_HTTP_TIMEOUT: float = 5.0
     NEIS_HTTP_MAX_RETRIES: int = 1
 
+    # Engineering Intelligence Reports (reports/pdf_generator.py). Local disk
+    # for now — there's no object-storage abstraction anywhere else in this
+    # codebase either, and adding one just for reports would be exactly the
+    # kind of unjustified complexity Backend Forge's Cardinal Rule warns
+    # against. Swap for S3/GCS-backed storage if/when Nakima needs reports
+    # to survive a redeploy of an ephemeral filesystem — same tradeoff
+    # already discussed for Cirvanna's Hugging Face Spaces vs. GCE decision.
+    REPORTS_DIR: str = "./reports_output"
+
     # Logging: "json" (default, structured) or "text" (human-readable dev logs).
     LOG_FORMAT: str = "json"
 
