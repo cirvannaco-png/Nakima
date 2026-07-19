@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import TypedDict
 
 from execution.sandbox import SandboxExecutor
 from execution.tool_registry import ToolRegistry
@@ -10,8 +10,8 @@ class Failure(TypedDict):
     stage: str
     command: str
     log: str
-    file: Optional[str]
-    line: Optional[int]
+    file: str | None
+    line: int | None
 
 
 # Best-effort file/line extraction per (language, stage). Order matters —
@@ -19,7 +19,7 @@ class Failure(TypedDict):
 # output format, not guarantees; a failure with no match is still
 # reported, just without a `file`/`line`, and the debug agent falls back
 # to working from the raw log.
-EXTRACTION_PATTERNS: Dict[str, Dict[str, List[re.Pattern]]] = {
+EXTRACTION_PATTERNS: dict[str, dict[str, list[re.Pattern]]] = {
     "python": {
         "format": [re.compile(r"^(?:would reformat|reformatted)\s+(?P<file>\S+\.py)", re.MULTILINE)],
         "lint": [re.compile(r"^(?P<file>[^\s:][^:]*\.py):(?P<line>\d+):\d+:", re.MULTILINE)],
@@ -57,7 +57,7 @@ EXTRACTION_PATTERNS: Dict[str, Dict[str, List[re.Pattern]]] = {
 }
 
 
-def _extract_file_and_line(language: str, stage: str, logs: str) -> tuple[Optional[str], Optional[int]]:
+def _extract_file_and_line(language: str, stage: str, logs: str) -> tuple[str | None, int | None]:
     for pattern in EXTRACTION_PATTERNS.get(language, {}).get(stage, []):
         match = pattern.search(logs)
         if match:
@@ -72,11 +72,11 @@ class ValidationPipeline:
     def __init__(self):
         self.executor = SandboxExecutor()
 
-    async def validate(self, repo_dir: Path, language: str = "python") -> Dict:
+    async def validate(self, repo_dir: Path, language: str = "python") -> dict:
         """Runs format/lint/build/test/security in sequence for the given
         language, stopping at the first failing stage (no point running
         tests if the build itself is broken)."""
-        failures: List[Failure] = []
+        failures: list[Failure] = []
         for stage in ["format", "lint", "build", "test", "security"]:
             commands = ToolRegistry.get_commands(language, stage)
             if not commands:
@@ -85,9 +85,15 @@ class ValidationPipeline:
                 result = await self.executor.run_build(repo_dir, [command])
                 if not result["success"]:
                     file, line = _extract_file_and_line(language, stage, result["logs"])
-                    failures.append(Failure(
-                        stage=stage, command=result["command"], log=result["logs"], file=file, line=line,
-                    ))
+                    failures.append(
+                        Failure(
+                            stage=stage,
+                            command=result["command"],
+                            log=result["logs"],
+                            file=file,
+                            line=line,
+                        )
+                    )
                     break
             if failures:
                 break

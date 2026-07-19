@@ -1,5 +1,3 @@
-from typing import List
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,18 +9,22 @@ class MemoryRetriever:
         self.session = session
         self.repo_id = repo_id
 
-    async def get_past_fixes(self, error_signature: str, limit: int = 5) -> List[KnowledgeNode]:
+    async def get_past_fixes(self, error_signature: str, limit: int = 5) -> list[KnowledgeNode]:
         """Find past fixes for a similar error. The original version
         searched for node_type == "commit", but nothing in the system ever
         indexes a fix that way — OutcomeAnalyzer.update_memory_from_failure
         stores "failure" and "fix" nodes connected by a "fixes" edge. This
         now searches "failure" summaries for a match and follows the edge
         to the fix that resolved it, which is what actually gets written."""
-        failure_stmt = select(KnowledgeNode).where(
-            KnowledgeNode.repository_id == self.repo_id,
-            KnowledgeNode.node_type == "failure",
-            KnowledgeNode.summary.ilike(f"%{error_signature}%"),
-        ).limit(limit)
+        failure_stmt = (
+            select(KnowledgeNode)
+            .where(
+                KnowledgeNode.repository_id == self.repo_id,
+                KnowledgeNode.node_type == "failure",
+                KnowledgeNode.summary.ilike(f"%{error_signature}%"),
+            )
+            .limit(limit)
+        )
         failures = (await self.session.execute(failure_stmt)).scalars().all()
         if not failures:
             return []
@@ -39,7 +41,7 @@ class MemoryRetriever:
         fix_stmt = select(KnowledgeNode).where(KnowledgeNode.id.in_(fix_ids))
         return list((await self.session.execute(fix_stmt)).scalars().all())
 
-    async def get_conventions(self, limit: int = 10) -> List[KnowledgeNode]:
+    async def get_conventions(self, limit: int = 10) -> list[KnowledgeNode]:
         stmt = (
             select(KnowledgeNode)
             .where(KnowledgeNode.repository_id == self.repo_id, KnowledgeNode.node_type == "convention")

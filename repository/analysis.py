@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from tree_sitter import Node, Parser
 from tree_sitter_languages import get_language
@@ -59,9 +58,9 @@ class RepositoryAnalyzer:
 
     def __init__(self, repo_dir: Path):
         self.repo_dir = Path(repo_dir)
-        self._parsers: Dict[str, Parser] = {}
+        self._parsers: dict[str, Parser] = {}
 
-    def _language_for(self, file_path: Path) -> Optional[str]:
+    def _language_for(self, file_path: Path) -> str | None:
         return LANG_BY_EXT.get(Path(file_path).suffix)
 
     def _get_parser(self, language: str) -> Parser:
@@ -115,7 +114,7 @@ class RepositoryAnalyzer:
             node = node.parent
         return "global"
 
-    def extract_symbols(self, file_path: Path) -> List[Dict]:
+    def extract_symbols(self, file_path: Path) -> list[dict]:
         """Extract function/class/method/import symbols from a single file.
         Returns [] for unsupported file types instead of guessing with the
         wrong grammar."""
@@ -132,13 +131,13 @@ class RepositoryAnalyzer:
         tree = parser.parse(code)
         rel_path = str(file_path.relative_to(self.repo_dir)) if file_path.is_absolute() else str(file_path)
 
-        symbols: List[Dict] = []
+        symbols: list[dict] = []
         node_types = LANG_NODE_TYPES.get(language, {})
         self._extract_recursive(tree.root_node, symbols, rel_path, language, node_types, inside_class=False)
         return symbols
 
     def _extract_recursive(
-        self, node: Node, symbols: List[Dict], rel_path: str, language: str, node_types: Dict, inside_class: bool
+        self, node: Node, symbols: list[dict], rel_path: str, language: str, node_types: dict, inside_class: bool
     ):
         func_type = node_types.get("function")
         class_type = node_types.get("class")
@@ -152,63 +151,73 @@ class RepositoryAnalyzer:
         if is_class:
             name_node = node.child_by_field_name("name")
             if name_node:
-                symbols.append({
-                    "type": "class",
-                    "name": name_node.text.decode(),
-                    "file": rel_path,
-                    "line_start": node.start_point[0] + 1,
-                    "line_end": node.end_point[0] + 1,
-                    "properties": {},
-                })
+                symbols.append(
+                    {
+                        "type": "class",
+                        "name": name_node.text.decode(),
+                        "file": rel_path,
+                        "line_start": node.start_point[0] + 1,
+                        "line_end": node.end_point[0] + 1,
+                        "properties": {},
+                    }
+                )
         elif is_explicit_method or (is_function and inside_class):
             # Python has no distinct method node — a function_definition
             # directly nested inside a class body is a method.
             name_node = node.child_by_field_name("name")
             if name_node:
-                symbols.append({
-                    "type": "method",
-                    "name": name_node.text.decode(),
-                    "file": rel_path,
-                    "line_start": node.start_point[0] + 1,
-                    "line_end": node.end_point[0] + 1,
-                    "properties": {"decorators": self._extract_decorators(node)},
-                })
+                symbols.append(
+                    {
+                        "type": "method",
+                        "name": name_node.text.decode(),
+                        "file": rel_path,
+                        "line_start": node.start_point[0] + 1,
+                        "line_end": node.end_point[0] + 1,
+                        "properties": {"decorators": self._extract_decorators(node)},
+                    }
+                )
         elif is_function:
             name_node = node.child_by_field_name("name")
             if name_node:
-                symbols.append({
-                    "type": "function",
-                    "name": name_node.text.decode(),
-                    "file": rel_path,
-                    "line_start": node.start_point[0] + 1,
-                    "line_end": node.end_point[0] + 1,
-                    "properties": {"decorators": self._extract_decorators(node)},
-                })
+                symbols.append(
+                    {
+                        "type": "function",
+                        "name": name_node.text.decode(),
+                        "file": rel_path,
+                        "line_start": node.start_point[0] + 1,
+                        "line_end": node.end_point[0] + 1,
+                        "properties": {"decorators": self._extract_decorators(node)},
+                    }
+                )
         elif node.type in import_types:
             self._extract_import_symbol(node, symbols, rel_path, language)
 
         for child in node.children:
-            self._extract_recursive(child, symbols, rel_path, language, node_types, inside_class=(inside_class or is_class))
+            self._extract_recursive(
+                child, symbols, rel_path, language, node_types, inside_class=(inside_class or is_class)
+            )
 
-    def _extract_decorators(self, func_node: Node) -> List[str]:
+    def _extract_decorators(self, func_node: Node) -> list[str]:
         decorators = []
         for child in func_node.children:
             if child.type == "decorator":
                 decorators.append(child.text.decode().strip())
         return decorators
 
-    def _extract_import_symbol(self, node: Node, symbols: List[Dict], rel_path: str, language: str):
+    def _extract_import_symbol(self, node: Node, symbols: list[dict], rel_path: str, language: str):
         targets = self._resolve_import_targets(node, language)
-        symbols.append({
-            "type": "import",
-            "name": node.text.decode().strip(),
-            "file": rel_path,
-            "line_start": node.start_point[0] + 1,
-            "line_end": node.end_point[0] + 1,
-            "properties": {"dependencies": targets},
-        })
+        symbols.append(
+            {
+                "type": "import",
+                "name": node.text.decode().strip(),
+                "file": rel_path,
+                "line_start": node.start_point[0] + 1,
+                "line_end": node.end_point[0] + 1,
+                "properties": {"dependencies": targets},
+            }
+        )
 
-    def _resolve_import_targets(self, node: Node, language: str) -> List[str]:
+    def _resolve_import_targets(self, node: Node, language: str) -> list[str]:
         if language == "python":
             if node.type == "import_statement":
                 return [c.text.decode() for c in node.children if c.type == "dotted_name"]
@@ -223,9 +232,7 @@ class RepositoryAnalyzer:
 
     def extract_structure_summary(self, max_files: int = 50) -> str:
         lines = []
-        candidates = [
-            f for f in self.repo_dir.rglob("*") if f.suffix in LANG_BY_EXT and f.is_file()
-        ][:max_files]
+        candidates = [f for f in self.repo_dir.rglob("*") if f.suffix in LANG_BY_EXT and f.is_file()][:max_files]
         for f in candidates:
             symbols = self.extract_symbols(f)
             names = [s["name"] for s in symbols if s["type"] in ("function", "class")]

@@ -13,8 +13,6 @@ class Repository(Base):
     full_name: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     github_repo_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     tasks = relationship("Task", back_populates="repository")

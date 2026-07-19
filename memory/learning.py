@@ -1,6 +1,5 @@
 import logging
 import uuid
-from typing import Dict, List, Optional
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,13 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class OutcomeAnalyzer:
-    def __init__(self, session: AsyncSession, repo_id: int, provider_name: Optional[str] = None):
+    def __init__(self, session: AsyncSession, repo_id: int, provider_name: str | None = None):
         self.session = session
         self.repo_id = repo_id
         self.provider = provider_manager.get_provider(provider_name)
 
     async def record_pr_outcome(
-        self, pr_data: Dict, accepted: bool, review_comments: List[Dict], github_token: Optional[str] = None
+        self, pr_data: dict, accepted: bool, review_comments: list[dict], github_token: str | None = None
     ):
         pr_node = KnowledgeNode(
             id=uuid.uuid4(),
@@ -54,9 +53,11 @@ class OutcomeAnalyzer:
         try:
             analysis = await self.provider.analyze(
                 diff_text,
-                {"task": "Summarize any coding conventions (naming, structure, style, docstrings, "
-                         "import ordering) this diff demonstrates, in 2-3 bullet points. If none are "
-                         "evident, say so explicitly."},
+                {
+                    "task": "Summarize any coding conventions (naming, structure, style, docstrings, "
+                    "import ordering) this diff demonstrates, in 2-3 bullet points. If none are "
+                    "evident, say so explicitly."
+                },
             )
         except Exception as e:
             logger.warning(f"Provider convention extraction failed: {e}")

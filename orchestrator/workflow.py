@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Dict, List
 
 from github import Github  # PyGithub — safe now that our local package is githubapp, not github
 from sqlalchemy import select
@@ -27,9 +26,7 @@ MAX_VALIDATION_RETRIES = 3
 
 
 class WorkflowOrchestrator:
-    async def handle_webhook_event(
-        self, event_type: str, payload: Dict, repo_full_name: str, github_token: str
-    ):
+    async def handle_webhook_event(self, event_type: str, payload: dict, repo_full_name: str, github_token: str):
         repo = await self._ensure_repository(repo_full_name)
 
         if event_type == "issues" and payload.get("action") == "opened":
@@ -59,14 +56,17 @@ class WorkflowOrchestrator:
                 await session.refresh(repo)
             return repo
 
-    async def _handle_new_issue(self, payload: Dict, repo_full_name: str, github_token: str):
+    async def _handle_new_issue(self, payload: dict, repo_full_name: str, github_token: str):
         issue = payload["issue"]
         repo = await self._ensure_repository(repo_full_name)
 
         async with AsyncSessionLocal() as session:
             task = Task(
-                repository_id=repo.id, title=issue["title"], description=issue.get("body") or "",
-                status=TaskStatus.PENDING, event_payload=payload,
+                repository_id=repo.id,
+                title=issue["title"],
+                description=issue.get("body") or "",
+                status=TaskStatus.PENDING,
+                event_payload=payload,
             )
             session.add(task)
             await session.commit()
@@ -75,20 +75,19 @@ class WorkflowOrchestrator:
 
         asyncio.create_task(self.process_task(task_id, repo_full_name, payload, github_token))
 
-    async def _handle_pr_closed(self, payload: Dict, repo: Repository, github_token: str):
+    async def _handle_pr_closed(self, payload: dict, repo: Repository, github_token: str):
         """Learning-system hook: records the PR's outcome and, if merged,
         extracts conventions from the diff for future planning context."""
         pr_data = payload["pull_request"]
         merged = bool(pr_data.get("merged"))
 
-        review_comments: List[Dict] = []
+        review_comments: list[dict] = []
         try:
             gh = Github(github_token)
             gh_repo = gh.get_repo(repo.full_name)
             pr = gh_repo.get_pull(pr_data["number"])
             review_comments = [
-                {"author": r.user.login if r.user else None, "state": r.state, "body": r.body}
-                for r in pr.get_reviews()
+                {"author": r.user.login if r.user else None, "state": r.state, "body": r.body} for r in pr.get_reviews()
             ]
         except Exception as e:
             logger.warning(f"Could not fetch reviews for PR {pr_data['number']}: {e}")
@@ -98,10 +97,11 @@ class WorkflowOrchestrator:
             await kg.index_pull_request(pr_data, merged)
 
             analyzer = OutcomeAnalyzer(session, repo.id)
-            await analyzer.record_pr_outcome(pr_data, accepted=merged, review_comments=review_comments,
-                                              github_token=github_token)
+            await analyzer.record_pr_outcome(
+                pr_data, accepted=merged, review_comments=review_comments, github_token=github_token
+            )
 
-    async def _handle_push(self, payload: Dict, repo: Repository, github_token: str):
+    async def _handle_push(self, payload: dict, repo: Repository, github_token: str):
         """Rebuilds the code graph after a push lands, so GraphQuery/
         ContextBuilder reflect the latest state on the next task."""
         try:
@@ -114,7 +114,7 @@ class WorkflowOrchestrator:
         except Exception:
             logger.exception(f"Graph rebuild failed for {repo.full_name}")
 
-    async def process_task(self, task_id: str, repo_full_name: str, issue_payload: Dict, github_token: str):
+    async def process_task(self, task_id: str, repo_full_name: str, issue_payload: dict, github_token: str):
         async with AsyncSessionLocal() as session:
             task = await session.get(Task, task_id)
             if not task:
@@ -129,7 +129,7 @@ class WorkflowOrchestrator:
             logger.exception(f"Task {task_id} failed with an unhandled exception")
             await self._fail_task(task_id, str(e))
 
-    async def _run_pipeline(self, task_id: str, repo_full_name: str, issue_payload: Dict, github_token: str):
+    async def _run_pipeline(self, task_id: str, repo_full_name: str, issue_payload: dict, github_token: str):
         issue = issue_payload["issue"]
         repo = await self._ensure_repository(repo_full_name)
         repo_url = f"https://github.com/{repo_full_name}.git"
@@ -160,16 +160,20 @@ class WorkflowOrchestrator:
 
             context_builder = ContextBuilder(session, repo.id)
             enriched_context = await context_builder.build_for_task(
-                requirement=plan["requirement"], affected_files=plan["affected_files"], repo_dir=engine.working_dir,
+                requirement=plan["requirement"],
+                affected_files=plan["affected_files"],
+                repo_dir=engine.working_dir,
             )
 
         # 4. Generate changes
         impl_agent = ImplementationAgent()
-        impl_result = await impl_agent.execute(AgentRequest(
-            action="generate_changes",
-            context={"repo_dir": str(engine.working_dir)},
-            params={"plan": plan["steps"], "extra_context": enriched_context},
-        ))
+        impl_result = await impl_agent.execute(
+            AgentRequest(
+                action="generate_changes",
+                context={"repo_dir": str(engine.working_dir)},
+                params={"plan": plan["steps"], "extra_context": enriched_context},
+            )
+        )
         if not impl_result.success:
             await self._fail_task(task_id, impl_result.error or "code generation failed")
             return
@@ -184,20 +188,25 @@ class WorkflowOrchestrator:
                 break
             if attempt == MAX_VALIDATION_RETRIES:
                 await self._fail_task(
-                    task_id, f"Validation failed after {MAX_VALIDATION_RETRIES} retries: {validation_result['failures']}"
+                    task_id,
+                    f"Validation failed after {MAX_VALIDATION_RETRIES} retries: {validation_result['failures']}",
                 )
                 return
 
             async with AsyncSessionLocal() as session:
                 for failure in validation_result["failures"]:
-                    debug_result = await debug_agent.execute(AgentRequest(
-                        action="debug_failure",
-                        context={"repo_dir": str(engine.working_dir)},
-                        params={
-                            "error_log": failure["log"], "repo_dir": str(engine.working_dir),
-                            "session": session, "repo_id": repo.id,
-                        },
-                    ))
+                    debug_result = await debug_agent.execute(
+                        AgentRequest(
+                            action="debug_failure",
+                            context={"repo_dir": str(engine.working_dir)},
+                            params={
+                                "error_log": failure["log"],
+                                "repo_dir": str(engine.working_dir),
+                                "session": session,
+                                "repo_id": repo.id,
+                            },
+                        )
+                    )
                     if debug_result.success:
                         changed_files.extend(debug_result.result.get("files_changed", []))
                         async with AsyncSessionLocal() as learn_session:
@@ -209,9 +218,13 @@ class WorkflowOrchestrator:
         changed_files = sorted(set(changed_files))
         async with AsyncSessionLocal() as session:
             policy_checker = PolicyChecker(session, repo.id)
-            violations = await policy_checker.check_all_policies({
-                "branch": branch, "repo_dir": str(engine.working_dir), "files": changed_files,
-            })
+            violations = await policy_checker.check_all_policies(
+                {
+                    "branch": branch,
+                    "repo_dir": str(engine.working_dir),
+                    "files": changed_files,
+                }
+            )
         if violations:
             await self._fail_task(task_id, f"Policy violations: {'; '.join(violations)}")
             return
@@ -226,7 +239,8 @@ class WorkflowOrchestrator:
         pr = gh_repo.create_pull(
             title=issue["title"],
             body=f"Closes #{issue['number']}\n\nAutomated PR by Nakima.\n\n**Plan:**\n{plan['steps']}",
-            head=branch, base=gh_repo.default_branch,
+            head=branch,
+            base=gh_repo.default_branch,
         )
 
         async with AsyncSessionLocal() as session:

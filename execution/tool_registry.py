@@ -1,12 +1,9 @@
-from typing import Dict, List
-
-
 class ToolRegistry:
     """Maps languages to formatters, linters, build tools, test runners,
     and security scanners. Extend by adding a language key — everything
     else (ValidationPipeline, the sandbox Dockerfile) reads from here."""
 
-    registry: Dict[str, Dict[str, List[str]]] = {
+    registry: dict[str, dict[str, list[str]]] = {
         "python": {
             "format": ["black --check ."],
             "lint": ["flake8 ."],
@@ -38,13 +35,13 @@ class ToolRegistry:
     }
 
     @classmethod
-    def get_commands(cls, language: str, stage: str) -> List[str]:
+    def get_commands(cls, language: str, stage: str) -> list[str]:
         return cls.registry.get(language, {}).get(stage, [])
 
     @classmethod
-    def stages_for(cls, language: str) -> List[str]:
+    def stages_for(cls, language: str) -> list[str]:
         return list(cls.registry.get(language, {}).keys())
 
     @classmethod
-    def supported_languages(cls) -> List[str]:
+    def supported_languages(cls) -> list[str]:
         return list(cls.registry.keys())

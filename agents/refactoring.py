@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from agents.base import AgentRequest, AgentResponse, BaseAgent
 from utils.file_blocks import apply_file_changes, parse_file_blocks
@@ -13,7 +13,7 @@ class RefactoringAgent(BaseAgent):
             return await self.safe_move(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def refactor_file(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def refactor_file(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         repo_dir = Path(context["repo_dir"])
         file_path = repo_dir / params["file"]
         if not file_path.exists():
@@ -37,7 +37,7 @@ class RefactoringAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched})
 
-    async def safe_move(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def safe_move(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Move a file and ask the provider to rewrite every importer of it.
         `params['importers']` should be a list of relative file paths known
         to import the moved module (e.g. from GraphQuery.get_dependents)."""

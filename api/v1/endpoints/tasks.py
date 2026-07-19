@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/{task_id}")
-async def get_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):  # noqa: B008
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

@@ -27,23 +27,30 @@ async def test_check_required_reviewers_does_not_raise_nameerror(db_session):
     repo = await _make_repo_with_policy(db_session, required_reviewers=["alice", "bob"])
     checker = PolicyChecker(db_session, repo.id)
     assert await checker.check_required_reviewers({"requested_reviewers": [{"login": "alice"}]}) is False
-    assert await checker.check_required_reviewers(
-        {"requested_reviewers": [{"login": "alice"}, {"login": "bob"}]}
-    ) is True
+    assert (
+        await checker.check_required_reviewers({"requested_reviewers": [{"login": "alice"}, {"login": "bob"}]}) is True
+    )
 
 
 async def test_check_all_policies_does_not_raise_nameerror(db_session, sample_repo):
     # This previously crashed with NameError: `policy` referenced before assignment
     # in the branch-pattern violation message.
     repo = await _make_repo_with_policy(
-        db_session, branch_pattern=r"^nakima/.*", required_reviewers=["alice"],
-        require_docstrings=True, require_license=True,
+        db_session,
+        branch_pattern=r"^nakima/.*",
+        required_reviewers=["alice"],
+        require_docstrings=True,
+        require_license=True,
     )
     checker = PolicyChecker(db_session, repo.id)
-    violations = await checker.check_all_policies({
-        "branch": "bad-branch", "pr_data": {"requested_reviewers": []},
-        "repo_dir": str(sample_repo), "files": ["sample.py"],
-    })
+    violations = await checker.check_all_policies(
+        {
+            "branch": "bad-branch",
+            "pr_data": {"requested_reviewers": []},
+            "repo_dir": str(sample_repo),
+            "files": ["sample.py"],
+        }
+    )
     assert any("Branch name" in v for v in violations)
     assert any("reviewers" in v for v in violations)
     assert any("docstring" in v.lower() for v in violations)

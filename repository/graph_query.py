@@ -1,5 +1,4 @@
 import uuid
-from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,14 +13,14 @@ class GraphQuery:
         self.session = session
         self.repo_id = repo_id
 
-    async def get_symbol(self, name: str, kind: Optional[NodeType] = None) -> Optional[GraphNode]:
+    async def get_symbol(self, name: str, kind: NodeType | None = None) -> GraphNode | None:
         stmt = select(GraphNode).where(GraphNode.repository_id == self.repo_id, GraphNode.name == name)
         if kind:
             stmt = stmt.where(GraphNode.node_type == kind)
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_file_node(self, relative_path: str) -> Optional[GraphNode]:
+    async def get_file_node(self, relative_path: str) -> GraphNode | None:
         """Look up a file node by its actual relative path, not just its
         basename — the original ContextBuilder called get_symbol(name=file_rel)
         for this, but file nodes are indexed by `name` (basename only), so
@@ -34,21 +33,25 @@ class GraphQuery:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_callers(self, function_id: uuid.UUID) -> List[GraphNode]:
-        stmt = select(GraphNode).join(GraphEdge, GraphEdge.source_id == GraphNode.id).where(
-            GraphEdge.target_id == function_id, GraphEdge.edge_type == EdgeType.CALLS
+    async def get_callers(self, function_id: uuid.UUID) -> list[GraphNode]:
+        stmt = (
+            select(GraphNode)
+            .join(GraphEdge, GraphEdge.source_id == GraphNode.id)
+            .where(GraphEdge.target_id == function_id, GraphEdge.edge_type == EdgeType.CALLS)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_callees(self, function_id: uuid.UUID) -> List[GraphNode]:
-        stmt = select(GraphNode).join(GraphEdge, GraphEdge.target_id == GraphNode.id).where(
-            GraphEdge.source_id == function_id, GraphEdge.edge_type == EdgeType.CALLS
+    async def get_callees(self, function_id: uuid.UUID) -> list[GraphNode]:
+        stmt = (
+            select(GraphNode)
+            .join(GraphEdge, GraphEdge.target_id == GraphNode.id)
+            .where(GraphEdge.source_id == function_id, GraphEdge.edge_type == EdgeType.CALLS)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_tests_for_symbol(self, symbol_id: uuid.UUID) -> List[GraphNode]:
+    async def get_tests_for_symbol(self, symbol_id: uuid.UUID) -> list[GraphNode]:
         stmt = (
             select(GraphNode)
             .join(GraphEdge, GraphEdge.source_id == GraphNode.id)
@@ -61,27 +64,33 @@ class GraphQuery:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_dependents(self, file_node_id: uuid.UUID) -> List[GraphNode]:
+    async def get_dependents(self, file_node_id: uuid.UUID) -> list[GraphNode]:
         """Files that import this file/symbol."""
-        stmt = select(GraphNode).join(GraphEdge, GraphEdge.source_id == GraphNode.id).where(
-            GraphEdge.target_id == file_node_id, GraphEdge.edge_type == EdgeType.IMPORTS
+        stmt = (
+            select(GraphNode)
+            .join(GraphEdge, GraphEdge.source_id == GraphNode.id)
+            .where(GraphEdge.target_id == file_node_id, GraphEdge.edge_type == EdgeType.IMPORTS)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_dependencies(self, file_node_id: uuid.UUID) -> List[GraphNode]:
+    async def get_dependencies(self, file_node_id: uuid.UUID) -> list[GraphNode]:
         """Files/symbols this file imports."""
-        stmt = select(GraphNode).join(GraphEdge, GraphEdge.target_id == GraphNode.id).where(
-            GraphEdge.source_id == file_node_id, GraphEdge.edge_type == EdgeType.IMPORTS
+        stmt = (
+            select(GraphNode)
+            .join(GraphEdge, GraphEdge.target_id == GraphNode.id)
+            .where(GraphEdge.source_id == file_node_id, GraphEdge.edge_type == EdgeType.IMPORTS)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_contained_symbols(self, container_id: uuid.UUID) -> List[GraphNode]:
+    async def get_contained_symbols(self, container_id: uuid.UUID) -> list[GraphNode]:
         """Symbols directly declared inside a file or class (functions,
         methods, nested classes)."""
-        stmt = select(GraphNode).join(GraphEdge, GraphEdge.target_id == GraphNode.id).where(
-            GraphEdge.source_id == container_id, GraphEdge.edge_type == EdgeType.CONTAINS
+        stmt = (
+            select(GraphNode)
+            .join(GraphEdge, GraphEdge.target_id == GraphNode.id)
+            .where(GraphEdge.source_id == container_id, GraphEdge.edge_type == EdgeType.CONTAINS)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

@@ -1,5 +1,4 @@
 import uuid
-from typing import Dict, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +11,7 @@ class KnowledgeGraphBuilder:
         self.session = session
         self.repo_id = repo_id
 
-    async def index_issue(self, issue_data: Dict) -> KnowledgeNode:
+    async def index_issue(self, issue_data: dict) -> KnowledgeNode:
         node = KnowledgeNode(
             id=uuid.uuid4(),  # generated eagerly so it can be referenced before flush
             repository_id=self.repo_id,
@@ -25,7 +24,7 @@ class KnowledgeGraphBuilder:
         await self.session.flush()
         return node
 
-    async def index_pull_request(self, pr_data: Dict, merged: bool) -> KnowledgeNode:
+    async def index_pull_request(self, pr_data: dict, merged: bool) -> KnowledgeNode:
         node = KnowledgeNode(
             id=uuid.uuid4(),
             repository_id=self.repo_id,
@@ -38,7 +37,7 @@ class KnowledgeGraphBuilder:
         await self.session.flush()
         return node
 
-    async def link_fix_to_issue(self, fix_commit_sha: str, issue_number: int) -> Optional[KnowledgeEdge]:
+    async def link_fix_to_issue(self, fix_commit_sha: str, issue_number: int) -> KnowledgeEdge | None:
         """Links a fix (indexed as a 'commit' knowledge node — call
         index_commit first, or pass an already-indexed sha) to the issue
         it resolves. Returns None (and logs nothing louder than that) if

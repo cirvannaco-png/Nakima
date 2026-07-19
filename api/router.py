@@ -1,14 +1,15 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.v1.router import router as v1_router
-from core.config import settings
+from core.config import PreflightError, preflight, settings
 from core.limiter import limiter
 from core.logging import setup_logging
 from githubapp.app import router as github_router
-
 
 OPENAPI_DESCRIPTION = """
 **Nakima** is a multi-agent orchestration platform that plans, executes, and
@@ -33,6 +34,15 @@ OPENAPI_TAGS = [
 
 def create_app() -> FastAPI:
     setup_logging()
+    log = logging.getLogger("nakima.startup")
+    try:
+        warnings = preflight()
+    except PreflightError as exc:
+        log.error("preflight_failed", extra={"error": str(exc)})
+        raise
+    for w in warnings:
+        log.warning("preflight_warning", extra={"warning": w})
+
     app = FastAPI(
         title="Nakima",
         version=settings.VERSION,

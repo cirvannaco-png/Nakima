@@ -3,6 +3,7 @@
 Network calls are mocked — we only verify the provider builds the request
 correctly and surfaces a clean error when the token is missing.
 """
+
 import os
 
 import httpx
@@ -19,8 +20,10 @@ async def test_missing_token_raises():
         from importlib import reload
 
         from core import config as config_mod
+
         reload(config_mod)
         from providers.implementations import github_models as gm_mod
+
         reload(gm_mod)
 
         provider = gm_mod.GitHubModelsProvider()
@@ -39,8 +42,10 @@ async def test_call_builds_openai_shaped_request(monkeypatch):
     from importlib import reload
 
     from core import config as config_mod
+
     reload(config_mod)
     from providers.implementations import github_models as gm_mod
+
     reload(gm_mod)
 
     captured = {}

@@ -10,9 +10,7 @@ def test_extract_symbols_distinguishes_function_method_class(sample_repo):
     assert by_name["__init__"]["type"] == "method"
     assert by_name["render"]["type"] == "method"
     assert by_name["standalone_function"]["type"] == "function"
-    assert {"import os", "from pathlib import Path"} == {
-        s["name"] for s in symbols if s["type"] == "import"
-    }
+    assert {"import os", "from pathlib import Path"} == {s["name"] for s in symbols if s["type"] == "import"}
 
 
 def test_extract_symbols_unsupported_extension_returns_empty(sample_repo):

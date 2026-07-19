@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from agents.base import AgentRequest, AgentResponse, BaseAgent
 from utils.file_blocks import apply_file_changes, parse_file_blocks
@@ -13,7 +13,7 @@ class DocumentationAgent(BaseAgent):
             return await self.generate_docs(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def update_readme(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def update_readme(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         repo_dir = Path(context["repo_dir"])
         readme = repo_dir / "README.md"
         existing = readme.read_text() if readme.exists() else ""
@@ -36,7 +36,7 @@ class DocumentationAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched})
 
-    async def generate_docs(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def generate_docs(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Generate API documentation for a given module (params['file'])."""
         repo_dir = Path(context["repo_dir"])
         file_path = repo_dir / params["file"]

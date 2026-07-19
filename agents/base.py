@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 from providers.base import AIProvider
 from providers.manager import provider_manager
@@ -9,15 +9,15 @@ from providers.manager import provider_manager
 @dataclass
 class AgentRequest:
     action: str
-    context: Dict[str, Any] = field(default_factory=dict)
-    params: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class AgentResponse:
     success: bool
-    result: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    result: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
 
 
 class BaseAgent(ABC):

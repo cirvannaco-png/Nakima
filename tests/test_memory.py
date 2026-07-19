@@ -1,7 +1,7 @@
-from models.repository import Repository
 from memory.knowledge_graph import KnowledgeGraphBuilder
 from memory.learning import OutcomeAnalyzer
 from memory.retriever import MemoryRetriever
+from models.repository import Repository
 
 
 async def _make_repo(db_session):

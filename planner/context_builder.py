@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,9 +16,9 @@ class ContextBuilder:
         self.repo_id = repo_id
 
     async def build_for_task(
-        self, requirement: str, affected_files: List[str], repo_dir: Path, max_snippet_chars: int = 2000
-    ) -> Dict[str, Any]:
-        context: Dict[str, Any] = {
+        self, requirement: str, affected_files: list[str], repo_dir: Path, max_snippet_chars: int = 2000
+    ) -> dict[str, Any]:
+        context: dict[str, Any] = {
             "requirement": requirement,
             "code_snippets": [],
             "dependency_subgraph": {},

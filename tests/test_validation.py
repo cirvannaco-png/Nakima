@@ -2,9 +2,10 @@ from validation.pipeline import _extract_file_and_line
 
 
 def test_python_flake8_extraction():
-    assert _extract_file_and_line(
-        "python", "lint", "app/routes.py:12:5: E302 expected 2 blank lines, got 1"
-    ) == ("app/routes.py", 12)
+    assert _extract_file_and_line("python", "lint", "app/routes.py:12:5: E302 expected 2 blank lines, got 1") == (
+        "app/routes.py",
+        12,
+    )
 
 
 def test_python_pytest_extraction():
