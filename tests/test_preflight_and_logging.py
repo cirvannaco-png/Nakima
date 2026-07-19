@@ -9,7 +9,14 @@ from core.logging import JsonFormatter
 
 
 def test_preflight_ok_with_github_token():
-    s = Settings(DEFAULT_AI_PROVIDER="github", GITHUB_TOKEN="x", GITHUB_WEBHOOK_SECRET="")
+    s = Settings(
+        DEFAULT_AI_PROVIDER="github",
+        GITHUB_TOKEN="x",
+        GITHUB_APP_ID=None,
+        GITHUB_PRIVATE_KEY=None,
+        GITHUB_PRIVATE_KEY_PATH=None,
+        GITHUB_WEBHOOK_SECRET="",
+    )
     warnings = preflight(s)
     assert any("GitHub App not configured" in w for w in warnings)
 

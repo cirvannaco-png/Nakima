@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 os.environ.setdefault("GITHUB_APP_ID", "123456")
+os.environ.setdefault("GITHUB_PRIVATE_KEY", "test-private-key-not-real")
 os.environ.setdefault("GITHUB_WEBHOOK_SECRET", "testsecret")
 os.environ.setdefault("GITHUB_TOKEN", "ghp-test")
 os.environ.setdefault("DEFAULT_AI_PROVIDER", "github")
@@ -14,12 +15,15 @@ os.environ.setdefault("DEFAULT_AI_PROVIDER", "github")
 async def db_session():
     from database.base import Base
     from models.graph import GraphEdge, GraphNode  # noqa: F401
+    from models.intelligence.decision import EngineeringDecision, EngineeringEvent  # noqa: F401
     from models.knowledge import KnowledgeEdge, KnowledgeNode  # noqa: F401
     from models.neis.evolution_roadmap import EvolutionRoadmap, EvolutionRoadmapItem  # noqa: F401
     from models.neis.project_reality import ProjectRealityModel  # noqa: F401
     from models.neis.technology_intel import TechnologyIntel  # noqa: F401
     from models.neis.user_intent import UserIntent  # noqa: F401
     from models.policy import RepositoryPolicy  # noqa: F401
+    from models.report import EngineeringReport  # noqa: F401
+    from models.security import SecurityFinding  # noqa: F401
 
     # Import every model so Base.metadata is fully populated before create_all.
     from models.repository import Repository  # noqa: F401

@@ -50,4 +50,7 @@ class DocumentationAgent(BaseAgent):
         docs_dir.mkdir(exist_ok=True)
         doc_file = docs_dir / f"{Path(params['file']).stem}.md"
         doc_file.write_text(response.content)  # explain() returns freeform prose, not FILE-block format
-        return AgentResponse(success=True, result={"doc_file": str(doc_file.relative_to(repo_dir))})
+        doc_path = str(doc_file.relative_to(repo_dir))
+        # Include doc_path in files_changed so callers (e.g. _run_pipeline)
+        # can git-add the generated file and include it in the PR commit.
+        return AgentResponse(success=True, result={"doc_file": doc_path, "files_changed": [doc_path]})

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 
 from github import Github  # PyGithub — safe now that our local package is githubapp, not github
 from sqlalchemy import select
@@ -8,10 +9,14 @@ from agents.base import AgentRequest
 from agents.debug import DebugAgent
 from agents.implementation import ImplementationAgent
 from database.session import AsyncSessionLocal
+from intelligence.decision_registry import DecisionRegistry
+from intelligence.event_log import EventLog
 from memory.knowledge_graph import KnowledgeGraphBuilder
 from memory.learning import OutcomeAnalyzer
 from models.repository import Repository
 from models.task import Task, TaskStatus
+from neis.reasoning.arbitration_engine import DriftVerdict
+from neis.reasoning.decision_engine import DecisionEngine
 from planner.context_builder import ContextBuilder
 from planner.planner import PlanningEngine
 from repository.analysis import RepositoryAnalyzer
@@ -116,7 +121,7 @@ class WorkflowOrchestrator:
 
     async def process_task(self, task_id: str, repo_full_name: str, issue_payload: dict, github_token: str):
         async with AsyncSessionLocal() as session:
-            task = await session.get(Task, task_id)
+            task = await session.get(Task, uuid.UUID(task_id))
             if not task:
                 logger.error(f"Task {task_id} not found")
                 return
@@ -164,6 +169,49 @@ class WorkflowOrchestrator:
                 affected_files=plan["affected_files"],
                 repo_dir=engine.working_dir,
             )
+
+        # 3.5. Intent Drift Validation — NEIS's Decision Engine judges the
+        # plan against the latest ProjectRealityModel and stated UserIntent
+        # before any code exists, per the Engineering Reasoner principle:
+        # checks happen before implementation, not after.
+        proposed_change = {
+            "title": issue["title"],
+            "description": plan["requirement"],
+            "affected_files": plan["affected_files"],
+            "steps": plan["steps"],
+        }
+        async with AsyncSessionLocal() as session:
+            drift_result = await DecisionEngine(session, repo.id).validate(proposed_change)
+            await DecisionRegistry(session, repo.id).record(
+                context=f"Intent drift validation for issue #{issue['number']}: {issue['title']}",
+                problem=plan["requirement"],
+                decision=f"Verdict: {drift_result.verdict.value}",
+                justification="; ".join(drift_result.reasoning),
+                related_files=plan["affected_files"],
+                related_issues=[str(issue["number"])],
+            )
+
+        if drift_result.verdict == DriftVerdict.BLOCK:
+            await self._fail_task(task_id, f"Blocked by Intent Drift Validator: {'; '.join(drift_result.reasoning)}")
+            return
+        if drift_result.verdict == DriftVerdict.REQUEST_CONFIRMATION:
+            # No human-in-the-loop resume flow exists yet — that needs a new
+            # TaskStatus plus a confirmation endpoint, which is a real gap,
+            # not something to silently paper over by treating this the
+            # same as an ordinary failure. Flagged distinctly in the error
+            # so it's greppable and so a maintainer knows to re-file once
+            # UserIntent is filled in, rather than assuming the plan itself
+            # was rejected.
+            await self._fail_task(
+                task_id,
+                "NEEDS_CONFIRMATION: "
+                + "; ".join(drift_result.reasoning)
+                + " — automatic confirmation flow is not implemented yet; set or refresh UserIntent "
+                "for this repository and re-open the issue.",
+            )
+            return
+        # WARN and APPROVE both proceed — WARN's reasoning is already
+        # captured in the EngineeringDecision recorded above.
 
         # 4. Generate changes
         impl_agent = ImplementationAgent()
@@ -248,13 +296,35 @@ class WorkflowOrchestrator:
             task.status = TaskStatus.SUCCESS
             task.pr_url = pr.html_url
             await session.commit()
+
+            await EventLog(session, repo.id).record(
+                task_id=uuid.UUID(task_id),
+                task_description=issue["title"],
+                reason=issue.get("body") or issue["title"],
+                chosen_solution=str(plan["steps"]),
+                files_modified=changed_files,
+                tests_executed=["format", "lint", "build", "test", "security"],
+                risk_level="low" if len(changed_files) <= 3 else "medium",
+                verification_status="passed",
+                dependencies_affected=[],
+            )
         logger.info(f"Task {task_id}: PR created at {pr.html_url}")
 
     async def _fail_task(self, task_id: str, error: str):
         async with AsyncSessionLocal() as session:
-            task = await session.get(Task, task_id)
+            task = await session.get(Task, uuid.UUID(task_id))
             if task:
                 task.status = TaskStatus.FAILED
                 task.error = error
                 await session.commit()
+
+                await EventLog(session, task.repository_id).record(
+                    task_id=uuid.UUID(task_id),
+                    task_description=task.title,
+                    reason=task.description or task.title,
+                    chosen_solution="none — task failed before a change was landed",
+                    risk_level="unknown",
+                    verification_status="failed",
+                    measured_impact={"error": error},
+                )
         logger.error(f"Task {task_id} failed: {error}")

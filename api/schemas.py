@@ -37,6 +37,85 @@ class PolicyUpdateRequest(BaseModel):
     review_required: bool | None = None
 
 
+class DecisionCreateRequest(BaseModel):
+    context: str
+    problem: str
+    decision: str
+    justification: str
+    alternatives: list[dict[str, Any]] = []
+    consequences: str | None = None
+    related_files: list[str] = []
+    related_issues: list[str] = []
+    author: str = "user"
+
+
+class DecisionResponse(BaseModel):
+    id: str
+    repository_id: int
+    context: str
+    problem: str
+    decision: str
+    justification: str
+    alternatives: list[dict[str, Any]]
+    consequences: str | None
+    related_files: list[str]
+    related_issues: list[str]
+    author: str
+    created_at: str
+
+
+class EventResponse(BaseModel):
+    id: str
+    repository_id: int
+    task_id: str | None
+    decision_id: str | None
+    timestamp: str
+    author: str
+    task_description: str
+    files_modified: list[str]
+    reason: str
+    chosen_solution: str
+    risk_level: str
+    verification_status: str
+    tests_executed: list[str]
+
+
+class ReportResponse(BaseModel):
+    id: str
+    repository_id: int
+    version: int
+    executive_summary: str
+    sections_included: list[str]
+    generated_at: str
+
+
+class SecurityScanRequest(BaseModel):
+    github_token: str | None = None
+
+
+class SecurityFindingResponse(BaseModel):
+    id: str
+    source: str
+    rule: str
+    severity: str
+    file_path: str
+    line_number: int | None
+    detail: str
+    status: str
+    first_seen_at: str
+    last_seen_at: str
+
+
+class SecurityScanResponse(BaseModel):
+    score: float
+    counts_by_severity: dict[str, int]
+    total_open: int
+    new_finding_count: int
+    resolved_finding_count: int
+    scanners_run: list[str]
+    scanners_skipped: list[str]
+
+
 class NEISAnalyzeRequest(BaseModel):
     github_token: str
 
