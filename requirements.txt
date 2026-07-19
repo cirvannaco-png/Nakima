@@ -31,3 +31,8 @@ prometheus-client==0.20.0
 networkx==3.3
 radon==6.0.1
 slowapi==0.1.9
+
+# NEIS (neis/analyzers/tech_scout.py) — real semver comparison instead of
+# string comparison, which breaks on "2.9.0" vs "2.10.0" (string-sorts
+# "2.10.0" before "2.9.0").
+packaging==24.1

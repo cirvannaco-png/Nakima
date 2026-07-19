@@ -1,7 +1,6 @@
 import uuid
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import networkx as nx
 from sqlalchemy import select
@@ -29,9 +28,9 @@ class GraphBuilder:
         self.session = session
         self.analyzer = RepositoryAnalyzer(self.repo_dir)
         # symbol name -> list of (node_id, NodeType)
-        self.global_symbols: Dict[str, List[Tuple[str, NodeType]]] = defaultdict(list)
+        self.global_symbols: dict[str, list[tuple[str, NodeType]]] = defaultdict(list)
         # relative file path -> file node id
-        self.file_nodes: Dict[str, str] = {}
+        self.file_nodes: dict[str, str] = {}
 
     async def build_full_graph(self) -> nx.DiGraph:
         await self._clear_existing_graph()
@@ -57,22 +56,21 @@ class GraphBuilder:
     async def _clear_existing_graph(self):
         await self.session.execute(
             GraphEdge.__table__.delete().where(
-                GraphEdge.source_id.in_(
-                    select(GraphNode.id).where(GraphNode.repository_id == self.repo_id)
-                )
+                GraphEdge.source_id.in_(select(GraphNode.id).where(GraphNode.repository_id == self.repo_id))
             )
         )
-        await self.session.execute(
-            GraphNode.__table__.delete().where(GraphNode.repository_id == self.repo_id)
-        )
+        await self.session.execute(GraphNode.__table__.delete().where(GraphNode.repository_id == self.repo_id))
 
     def _create_nodes_for_file(self, file_path: Path, graph: nx.DiGraph):
         rel_path = str(file_path.relative_to(self.repo_dir))
 
         file_node_id = str(uuid.uuid4())
         graph.add_node(
-            file_node_id, id=file_node_id, node_type=NodeType.FILE,
-            name=file_path.name, file_path=rel_path,
+            file_node_id,
+            id=file_node_id,
+            node_type=NodeType.FILE,
+            name=file_path.name,
+            file_path=rel_path,
         )
         self.file_nodes[rel_path] = file_node_id
         self.global_symbols[file_path.stem].append((file_node_id, NodeType.FILE))
@@ -90,8 +88,13 @@ class GraphBuilder:
             sym_id = str(uuid.uuid4())
             node_type = NodeType(sym["type"])
             graph.add_node(
-                sym_id, id=sym_id, node_type=node_type, name=sym["name"],
-                file_path=sym["file"], line_start=sym["line_start"], line_end=sym["line_end"],
+                sym_id,
+                id=sym_id,
+                node_type=node_type,
+                name=sym["name"],
+                file_path=sym["file"],
+                line_start=sym["line_start"],
+                line_end=sym["line_end"],
                 properties=sym.get("properties", {}),
             )
 
@@ -134,21 +137,25 @@ class GraphBuilder:
 
     async def _persist(self, graph: nx.DiGraph):
         for _node_id, data in graph.nodes(data=True):
-            self.session.add(GraphNode(
-                id=uuid.UUID(data["id"]),
-                repository_id=self.repo_id,
-                node_type=data["node_type"],
-                name=data["name"],
-                file_path=data.get("file_path"),
-                line_start=data.get("line_start"),
-                line_end=data.get("line_end"),
-                properties=data.get("properties", {}),
-            ))
+            self.session.add(
+                GraphNode(
+                    id=uuid.UUID(data["id"]),
+                    repository_id=self.repo_id,
+                    node_type=data["node_type"],
+                    name=data["name"],
+                    file_path=data.get("file_path"),
+                    line_start=data.get("line_start"),
+                    line_end=data.get("line_end"),
+                    properties=data.get("properties", {}),
+                )
+            )
         for u, v, data in graph.edges(data=True):
-            self.session.add(GraphEdge(
-                source_id=uuid.UUID(u),
-                target_id=uuid.UUID(v),
-                edge_type=data["edge_type"],
-                properties=data.get("properties", {}),
-            ))
+            self.session.add(
+                GraphEdge(
+                    source_id=uuid.UUID(u),
+                    target_id=uuid.UUID(v),
+                    edge_type=data["edge_type"],
+                    properties=data.get("properties", {}),
+                )
+            )
         await self.session.commit()

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -15,23 +15,79 @@ class RepositoryIndexResponse(BaseModel):
 
 
 class HealthScoreResponse(BaseModel):
-    score: Optional[float]
-    components: Optional[Dict[str, Any]] = None
-    reason: Optional[str] = None
+    score: float | None
+    components: dict[str, Any] | None = None
+    reason: str | None = None
 
 
 class SymbolLookupResponse(BaseModel):
     id: str
     name: str
     node_type: str
-    file_path: Optional[str]
-    line_start: Optional[int]
-    line_end: Optional[int]
+    file_path: str | None
+    line_start: int | None
+    line_end: int | None
 
 
 class PolicyUpdateRequest(BaseModel):
-    branch_pattern: Optional[str] = None
-    required_reviewers: Optional[List[str]] = None
-    require_docstrings: Optional[bool] = None
-    require_license: Optional[bool] = None
-    review_required: Optional[bool] = None
+    branch_pattern: str | None = None
+    required_reviewers: list[str] | None = None
+    require_docstrings: bool | None = None
+    require_license: bool | None = None
+    review_required: bool | None = None
+
+
+class NEISAnalyzeRequest(BaseModel):
+    github_token: str
+
+
+class NEISAnalyzeResponse(BaseModel):
+    roadmap_id: str
+    reality_id: str
+    recommendation_count: int
+    stages_completed: list[str]
+    stages_failed: dict[str, str]
+
+
+class NEISRoadmapItemResponse(BaseModel):
+    id: str
+    category: str
+    title: str
+    rationale: str
+    priority_score: float
+    effort_estimate: str
+    status: str
+
+
+class NEISRoadmapResponse(BaseModel):
+    id: str
+    status: str
+    summary: str
+    generated_at: str
+    items: list[NEISRoadmapItemResponse]
+
+
+class NEISRealityResponse(BaseModel):
+    id: str
+    languages: dict[str, int]
+    dependencies: list[dict[str, Any]]
+    loc_by_language: dict[str, int]
+    file_count: int
+    test_file_count: int
+    health_score: float | None
+    created_at: str
+
+
+class NEISIntentRequest(BaseModel):
+    goals: list[str] = []
+    constraints: list[str] = []
+    priority_weights: dict[str, float] = {}
+    notes: str | None = None
+
+
+class NEISIntentResponse(BaseModel):
+    id: str
+    goals: list[str]
+    constraints: list[str]
+    priority_weights: dict[str, float]
+    notes: str | None

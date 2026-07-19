@@ -15,13 +15,13 @@ Bugs fixed from the original scaffold:
      added an in-memory cache with expiry so we're not making a network
      round-trip to GitHub on every webhook delivery.
 """
+
 import time
-from typing import Dict
 
 import httpx
 import jwt
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 from core.config import settings
 
@@ -36,12 +36,10 @@ class GitHubAppAuth:
     def __init__(self):
         self.app_id = settings.GITHUB_APP_ID
         if not self.app_id:
-            raise GitHubAppAuthError(
-                "GITHUB_APP_ID is not configured. Set it in your .env or environment."
-            )
+            raise GitHubAppAuthError("GITHUB_APP_ID is not configured. Set it in your .env or environment.")
         self._private_key_pem = self._load_private_key()
         # installation_id -> {"token": str, "expires_at": float (unix ts)}
-        self._token_cache: Dict[int, Dict[str, float | str]] = {}
+        self._token_cache: dict[int, dict[str, float | str]] = {}
 
     def _load_private_key(self) -> str:
         if settings.GITHUB_PRIVATE_KEY:
@@ -53,7 +51,7 @@ class GitHubAppAuth:
                 "(raw PEM contents) or GITHUB_PRIVATE_KEY_PATH (path to the .pem "
                 "file downloaded from your GitHub App settings)."
             )
-        with open(key_path, "r") as f:
+        with open(key_path) as f:
             return f.read()
 
     def _generate_jwt(self) -> str:
@@ -61,7 +59,7 @@ class GitHubAppAuth:
         (as opposed to a specific installation)."""
         now = int(time.time())
         payload = {
-            "iat": now - 60,   # backdated 60s to tolerate clock drift, per GitHub's docs
+            "iat": now - 60,  # backdated 60s to tolerate clock drift, per GitHub's docs
             "exp": now + 600,  # GitHub caps this at 10 minutes
             "iss": self.app_id,
         }
@@ -116,6 +114,7 @@ class _LazyGitHubAppAuth:
     made `from githubapp.app import router` (and therefore `create_app()`)
     impossible to import in tests, CI, or before the app is fully configured.
     """
+
     _inner = None
 
     def _get(self):

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict
 
 from radon.complexity import cc_visit
 from radon.metrics import mi_visit
@@ -15,7 +14,7 @@ class HealthScorer:
     def __init__(self, repo_dir: Path):
         self.repo_dir = Path(repo_dir)
 
-    async def score(self) -> Dict:
+    async def score(self) -> dict:
         py_files = list(self.repo_dir.rglob("*.py"))
         if not py_files:
             return {"score": None, "reason": "no Python files found"}
@@ -81,10 +80,12 @@ class HealthScorer:
             # by re-parsing symbol count via the same file (best-effort).
             try:
                 import ast
+
                 tree = ast.parse(f.read_text())
                 total_symbols += sum(
-                    1 for n in ast.walk(tree)
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                    1
+                    for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
                     and not n.name.startswith("_")
                 )
             except Exception:

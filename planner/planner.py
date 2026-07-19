@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from providers.manager import provider_manager
 
@@ -9,7 +9,7 @@ class PlanningEngine:
     def __init__(self, provider_name: str | None = None):
         self.provider = provider_manager.get_provider(provider_name)
 
-    async def create_plan(self, requirement: str, repo_context: Dict[str, Any]) -> Dict:
+    async def create_plan(self, requirement: str, repo_context: dict[str, Any]) -> dict:
         analysis = await self.provider.analyze(
             code=repo_context.get("structure_summary", ""),
             context={"requirement": requirement},
@@ -26,7 +26,7 @@ class PlanningEngine:
             "rollback_plan": "Revert the generated commits and delete the feature branch.",
         }
 
-    def _extract_files(self, plan_text: str) -> List[str]:
+    def _extract_files(self, plan_text: str) -> list[str]:
         files = []
         for line in plan_text.split("\n"):
             stripped = line.strip().strip("`-* ")

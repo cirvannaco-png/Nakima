@@ -17,7 +17,11 @@ router = APIRouter()
 
 @router.post("/index", response_model=RepositoryIndexResponse)
 @limiter.limit("10/minute")
-async def index_repository(request: Request, req: RepositoryIndexRequest, db: AsyncSession = Depends(get_db)):
+async def index_repository(
+    request: Request,
+    req: RepositoryIndexRequest,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
     result = await db.execute(select(Repository).where(Repository.full_name == req.repo_full_name))
     repo = result.scalar_one_or_none()
     if not repo:
@@ -38,7 +42,11 @@ async def index_repository(request: Request, req: RepositoryIndexRequest, db: As
 
 
 @router.get("/{repo_full_name:path}/health", response_model=HealthScoreResponse)
-async def get_repository_health(repo_full_name: str, github_token: str, db: AsyncSession = Depends(get_db)):
+async def get_repository_health(
+    repo_full_name: str,
+    github_token: str,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
     result = await db.execute(select(Repository).where(Repository.full_name == repo_full_name))
     repo = result.scalar_one_or_none()
     if not repo:

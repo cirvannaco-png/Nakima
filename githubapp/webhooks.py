@@ -6,10 +6,10 @@ verify_webhook() across the three source files (one returned a bare dict, one
 returned a 2-tuple, one returned a 3-tuple) — none of which agreed with how
 github/app.py actually called it. This is the single reconciled version.
 """
+
 import hashlib
 import hmac
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 from fastapi import HTTPException, Request
 
@@ -19,9 +19,9 @@ from core.config import settings
 @dataclass
 class WebhookEvent:
     event_type: str
-    payload: Dict
+    payload: dict
     installation_id: int
-    repo_full_name: Optional[str]  # None for installation-level events (e.g. "installation")
+    repo_full_name: str | None  # None for installation-level events (e.g. "installation")
 
 
 async def verify_webhook(request: Request) -> WebhookEvent:
@@ -38,9 +38,7 @@ async def verify_webhook(request: Request) -> WebhookEvent:
         raise HTTPException(status_code=500, detail="GITHUB_WEBHOOK_SECRET is not configured")
 
     body = await request.body()
-    expected = "sha256=" + hmac.new(
-        settings.GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256
-    ).hexdigest()
+    expected = "sha256=" + hmac.new(settings.GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(signature, expected):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 

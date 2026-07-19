@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 
@@ -63,34 +63,34 @@ class ClaudeProvider(AIProvider):
             usage=data.get("usage", {}),
         )
 
-    async def analyze(self, code: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def analyze(self, code: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Analyze this code for bugs, security flaws, and improvements:\n\n{code}\n\nContext: {context}"
         return await self._call(prompt)
 
-    async def plan(self, requirement: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def plan(self, requirement: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Create a step-by-step implementation plan for this requirement:\n{requirement}\nContext: {context}"
         return await self._call(prompt)
 
-    async def generate(self, prompt: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def generate(self, prompt: str, context: dict[str, Any]) -> ProviderResponse:
         full_prompt = f"Generate code changes for: {prompt}\nContext: {context}"
         return await self._call(full_prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192)
 
-    async def debug(self, error: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def debug(self, error: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Debug this error:\n{error}\nContext: {context}"
         return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192)
 
-    async def review(self, diff: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def review(self, diff: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Review this diff for correctness, style, and security:\n{diff}\nContext: {context}"
         return await self._call(prompt)
 
-    async def refactor(self, code: str, instructions: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def refactor(self, code: str, instructions: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Refactor this code according to: {instructions}\nCode:\n{code}\nContext: {context}"
         return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192)
 
-    async def explain(self, code: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def explain(self, code: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Explain this code in detail:\n{code}"
         return await self._call(prompt)
 
-    async def generate_tests(self, code: str, context: Dict[str, Any]) -> ProviderResponse:
+    async def generate_tests(self, code: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Generate comprehensive unit tests for this code:\n{code}\nContext: {context}"
         return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192)

@@ -1,6 +1,5 @@
 import importlib
 import logging
-from typing import Dict, Type
 
 from core.config import settings
 from providers.base import AIProvider
@@ -10,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class ProviderManager:
     def __init__(self):
-        self._providers: Dict[str, Type[AIProvider]] = {}
-        self._instances: Dict[str, AIProvider] = {}
+        self._providers: dict[str, type[AIProvider]] = {}
+        self._instances: dict[str, AIProvider] = {}
         self._load_providers()
 
     def _load_providers(self):
@@ -36,8 +35,7 @@ class ProviderManager:
         if provider_name not in self._instances:
             if provider_name not in self._providers:
                 raise ValueError(
-                    f"Unknown or unavailable provider: {provider_name}. "
-                    f"Available: {list(self._providers.keys())}"
+                    f"Unknown or unavailable provider: {provider_name}. " f"Available: {list(self._providers.keys())}"
                 )
             self._instances[provider_name] = self._providers[provider_name]()
         return self._instances[provider_name]

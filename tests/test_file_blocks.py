@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from utils.file_blocks import apply_file_changes, parse_file_blocks
 
 SAMPLE_RESPONSE = """
@@ -48,9 +50,7 @@ def test_apply_file_changes_writes_and_deletes(tmp_path: Path):
 
 def test_apply_file_changes_blocks_path_traversal(tmp_path: Path):
     from utils.file_blocks import FileChange
+
     malicious = [FileChange(path="../../etc/passwd", content="pwned")]
-    try:
+    with pytest.raises(ValueError):
         apply_file_changes(tmp_path, malicious)
-        assert False, "expected ValueError for path traversal"
-    except ValueError:
-        pass

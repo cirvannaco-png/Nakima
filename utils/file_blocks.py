@@ -7,23 +7,18 @@ This replaces the original stub, which just wrote the entire raw AI response
 into a single hardcoded `nakima_generated.py` file regardless of how many
 files were actually supposed to change or what language they were in.
 """
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 FILE_BLOCK_RE = re.compile(
-    r"###\s*FILE:\s*(?P<path>\S+)\s*\n"
-    r"```[a-zA-Z0-9_+-]*\n"
-    r"(?P<body>.*?)"
-    r"\n```\s*\n"
-    r"###\s*END FILE",
+    r"###\s*FILE:\s*(?P<path>\S+)\s*\n" r"```[a-zA-Z0-9_+-]*\n" r"(?P<body>.*?)" r"\n```\s*\n" r"###\s*END FILE",
     re.DOTALL,
 )
 
 DELETE_BLOCK_RE = re.compile(
-    r"###\s*FILE:\s*(?P<path>\S+)\s+DELETE\s*\n"
-    r"###\s*END FILE",
+    r"###\s*FILE:\s*(?P<path>\S+)\s+DELETE\s*\n" r"###\s*END FILE",
 )
 
 
@@ -33,14 +28,14 @@ class FileChange:
     content: str | None  # None means "delete this file"
 
 
-def parse_file_blocks(response_text: str) -> List[FileChange]:
+def parse_file_blocks(response_text: str) -> list[FileChange]:
     """Extract FileChange entries from an AI response.
 
     Falls back to returning an empty list (not a crash) if the model didn't
     follow the format — callers should treat that as "nothing to apply" and
     surface it, rather than silently writing garbage to disk.
     """
-    changes: List[FileChange] = []
+    changes: list[FileChange] = []
     seen_paths: set[str] = set()
 
     for match in DELETE_BLOCK_RE.finditer(response_text):
@@ -59,10 +54,10 @@ def parse_file_blocks(response_text: str) -> List[FileChange]:
     return changes
 
 
-def apply_file_changes(repo_dir: Path, changes: List[FileChange]) -> List[str]:
+def apply_file_changes(repo_dir: Path, changes: list[FileChange]) -> list[str]:
     """Writes/deletes files on disk. Returns the list of paths (relative to
     repo_dir, as strings) that were modified, for use in `git add` / commit."""
-    touched: List[str] = []
+    touched: list[str] = []
     for change in changes:
         target = (repo_dir / change.path).resolve()
         # Guard against path traversal from a misbehaving model response.

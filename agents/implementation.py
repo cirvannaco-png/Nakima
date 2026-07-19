@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from agents.base import AgentRequest, AgentResponse, BaseAgent
 from repository.engine import RepositoryEngine
@@ -14,7 +14,7 @@ class ImplementationAgent(BaseAgent):
             return await self.full_implementation(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def generate_changes(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def generate_changes(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Ask the provider to implement `params['plan']` against the repo at
         context['repo_dir'], parse the response into individual file writes,
         and apply them. Returns the list of touched file paths."""
@@ -49,7 +49,7 @@ class ImplementationAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched})
 
-    async def full_implementation(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def full_implementation(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Full cycle: clone -> branch -> generate -> commit -> push."""
         engine = RepositoryEngine(context["repo_url"], context.get("github_token"))
         await engine.clone()
@@ -60,7 +60,7 @@ class ImplementationAgent(BaseAgent):
         if not resp.success:
             return resp
 
-        files_changed: List[str] = resp.result["files_changed"]
+        files_changed: list[str] = resp.result["files_changed"]
         await engine.commit_changes(f"feat: {params.get('title', 'automated change')}", files_changed)
         await engine.push_branch(branch)
         return AgentResponse(success=True, result={"branch": branch, "files_changed": files_changed})

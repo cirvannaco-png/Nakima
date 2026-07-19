@@ -1,7 +1,6 @@
 import ast
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +13,7 @@ class PolicyChecker:
         self.session = session
         self.repo_id = repo_id
 
-    async def _get_policy(self) -> Optional[RepositoryPolicy]:
+    async def _get_policy(self) -> RepositoryPolicy | None:
         stmt = select(RepositoryPolicy).where(RepositoryPolicy.repository_id == self.repo_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -25,14 +24,14 @@ class PolicyChecker:
             return True
         return re.match(policy.branch_pattern, branch_name) is not None
 
-    async def check_required_reviewers(self, pr_data: Dict) -> bool:
+    async def check_required_reviewers(self, pr_data: dict) -> bool:
         policy = await self._get_policy()
         if not policy or not policy.required_reviewers:
             return True
         assigned = [r["login"] for r in pr_data.get("requested_reviewers", [])]
         return all(r in assigned for r in policy.required_reviewers)
 
-    async def check_coding_standards(self, repo_dir: Path, files: List[str]) -> List[str]:
+    async def check_coding_standards(self, repo_dir: Path, files: list[str]) -> list[str]:
         policy = await self._get_policy()
         if not policy or not policy.require_docstrings:
             return []
@@ -47,7 +46,7 @@ class PolicyChecker:
             violations.extend(f"Missing docstring: {rel_path}::{name}" for name in missing)
         return violations
 
-    def _missing_docstrings(self, file_path: Path) -> List[str]:
+    def _missing_docstrings(self, file_path: Path) -> list[str]:
         """Real implementation via the ast module — the original draft
         called self._has_docstrings() but never defined it anywhere."""
         try:
@@ -57,7 +56,7 @@ class PolicyChecker:
 
         missing = []
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 if node.name.startswith("_"):
                     continue  # private/dunder — not held to the public docstring bar
                 if ast.get_docstring(node) is None:
@@ -70,10 +69,10 @@ class PolicyChecker:
             return True
         return (repo_dir / "LICENSE").exists() or (repo_dir / "LICENSE.md").exists()
 
-    async def check_all_policies(self, context: Dict) -> List[str]:
+    async def check_all_policies(self, context: dict) -> list[str]:
         """Returns a list of human-readable violations. Empty list = clear to proceed."""
         policy = await self._get_policy()
-        violations: List[str] = []
+        violations: list[str] = []
         if not policy:
             return violations
 

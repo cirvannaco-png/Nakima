@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic_settings import BaseSettings
 
 
@@ -27,9 +26,9 @@ class Settings(BaseSettings):
     # A GitHub App private key comes from GitHub as a downloaded .pem file (PKCS#1 RSA).
     # Provide EITHER the raw PEM contents (GITHUB_PRIVATE_KEY) OR a path to the .pem file
     # (GITHUB_PRIVATE_KEY_PATH). The path is easier to manage in most deployments.
-    GITHUB_APP_ID: Optional[str] = None
-    GITHUB_PRIVATE_KEY: Optional[str] = None
-    GITHUB_PRIVATE_KEY_PATH: Optional[str] = None
+    GITHUB_APP_ID: str | None = None
+    GITHUB_PRIVATE_KEY: str | None = None
+    GITHUB_PRIVATE_KEY_PATH: str | None = None
     GITHUB_WEBHOOK_SECRET: str = ""
 
     # AI Providers
@@ -43,14 +42,14 @@ class Settings(BaseSettings):
     # https://github.com/settings/personal-access-tokens/new and set it as
     # GITHUB_TOKEN. GITHUB_MODELS_TOKEN can override it if you want to use a
     # different token for inference than for repo automation.
-    GITHUB_TOKEN: Optional[str] = None
-    GITHUB_MODELS_TOKEN: Optional[str] = None
+    GITHUB_TOKEN: str | None = None
+    GITHUB_MODELS_TOKEN: str | None = None
     GITHUB_MODELS_MODEL: str = "openai/gpt-4o-mini"
 
     # Optional paid providers.
-    ANTHROPIC_API_KEY: Optional[str] = None
-    OPENAI_API_KEY: Optional[str] = None
-    DEEPSEEK_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
+    DEEPSEEK_API_KEY: str | None = None
 
     # Execution
     EXECUTION_MAX_RETRIES: int = 2
@@ -61,6 +60,16 @@ class Settings(BaseSettings):
     # Security
     SCAN_ON_PR: bool = True
     SECRET_DETECTION: bool = True
+
+    # NEIS (neis/analyzers/tech_scout.py) — outbound calls to PyPI/npm to
+    # check current upstream versions. Short timeout + low retry count on
+    # purpose: a slow/unreachable registry should degrade one package's
+    # intel to "unknown", not stall the whole evolution run.
+    NEIS_HTTP_TIMEOUT: float = 5.0
+    NEIS_HTTP_MAX_RETRIES: int = 1
+
+    # Logging: "json" (default, structured) or "text" (human-readable dev logs).
+    LOG_FORMAT: str = "json"
 
     class Config:
         env_file = ".env"
@@ -77,3 +86,64 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+# --- Runtime preflight -----------------------------------------------------
+
+class PreflightError(RuntimeError):
+    """Raised when required configuration is missing or invalid."""
+
+
+def preflight(s: "Settings | None" = None) -> list[str]:
+    """Validate that required env vars are present for the active environment.
+
+    Returns the list of warning strings (non-fatal). Raises PreflightError
+    when a required value is missing.
+    """
+    s = s or settings
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # AI provider must have a usable credential.
+    provider = (s.DEFAULT_AI_PROVIDER or "").lower()
+    if provider == "github":
+        if not (s.GITHUB_MODELS_TOKEN or s.GITHUB_TOKEN):
+            errors.append(
+                "DEFAULT_AI_PROVIDER=github but neither GITHUB_MODELS_TOKEN "
+                "nor GITHUB_TOKEN is set."
+            )
+    elif provider == "claude":
+        if not s.ANTHROPIC_API_KEY:
+            errors.append("DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing.")
+    elif provider == "openai":
+        if not s.OPENAI_API_KEY:
+            errors.append("DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing.")
+    elif provider == "deepseek":
+        if not s.DEEPSEEK_API_KEY:
+            errors.append("DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing.")
+
+    # GitHub App: optional overall, but if partly set, all three must be present.
+    app_bits = [s.GITHUB_APP_ID, (s.GITHUB_PRIVATE_KEY or s.GITHUB_PRIVATE_KEY_PATH), s.GITHUB_WEBHOOK_SECRET]
+    if any(app_bits) and not all(app_bits):
+        errors.append(
+            "GitHub App is partially configured: set GITHUB_APP_ID, "
+            "GITHUB_PRIVATE_KEY (or GITHUB_PRIVATE_KEY_PATH), and "
+            "GITHUB_WEBHOOK_SECRET together — or leave them all unset."
+        )
+    elif not any(app_bits):
+        warnings.append(
+            "GitHub App not configured — webhook endpoints will reject requests. "
+            "Set GITHUB_APP_ID/GITHUB_PRIVATE_KEY/GITHUB_WEBHOOK_SECRET to enable."
+        )
+
+    if s.ENVIRONMENT == "production":
+        if s.DB_PASSWORD in ("", "nakima", "changeme"):
+            errors.append("ENVIRONMENT=production but DB_PASSWORD is a default/empty value.")
+        if not s.GITHUB_WEBHOOK_SECRET:
+            errors.append("ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET.")
+
+    if errors:
+        raise PreflightError(
+            "Configuration preflight failed:\n  - " + "\n  - ".join(errors)
+        )
+    return warnings

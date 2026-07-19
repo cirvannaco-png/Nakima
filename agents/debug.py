@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +20,7 @@ class DebugAgent(BaseAgent):
             return await self.apply_fix(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def debug_failure(self, context: Dict, params: Dict) -> AgentResponse:
+    async def debug_failure(self, context: dict, params: dict) -> AgentResponse:
         """Given a validation failure's error log, correlate it to code via
         tree-sitter, optionally enrich with call-graph context (who calls
         the failing function), ask the provider for a fix, and apply it
@@ -34,8 +33,8 @@ class DebugAgent(BaseAgent):
         anywhere in the original scaffold."""
         error_log = params.get("error_log", "")
         repo_dir = Path(params["repo_dir"])
-        session: Optional[AsyncSession] = params.get("session")
-        repo_id: Optional[int] = params.get("repo_id")
+        session: AsyncSession | None = params.get("session")
+        repo_id: int | None = params.get("repo_id")
 
         frames = self._parse_python_stack_trace(error_log, repo_dir)
         analyzer = RepositoryAnalyzer(repo_dir)
@@ -57,12 +56,15 @@ class DebugAgent(BaseAgent):
 
             enriched.append(entry)
 
-        context_str = "\n".join(
-            f"In {f['file']}:{f['line']} (inside {f['scope']})"
-            + (f" — called by: {', '.join(f['callers'])}" if f.get("callers") else "")
-            + f"\n```\n{f['code']}\n```"
-            for f in enriched
-        ) or "(no stack frames could be parsed from the error log)"
+        context_str = (
+            "\n".join(
+                f"In {f['file']}:{f['line']} (inside {f['scope']})"
+                + (f" — called by: {', '.join(f['callers'])}" if f.get("callers") else "")
+                + f"\n```\n{f['code']}\n```"
+                for f in enriched
+            )
+            or "(no stack frames could be parsed from the error log)"
+        )
 
         response = await self.provider.debug(error_log, {"code_context": context_str, "frames": enriched})
 
@@ -77,7 +79,7 @@ class DebugAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched, "frames": enriched})
 
-    async def apply_fix(self, context: Dict, params: Dict) -> AgentResponse:
+    async def apply_fix(self, context: dict, params: dict) -> AgentResponse:
         """Apply a previously-generated fix response (in FILE-block format) to disk."""
         repo_dir = Path(context["repo_dir"])
         changes = parse_file_blocks(params["fix_response"])
@@ -86,7 +88,7 @@ class DebugAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched})
 
-    def _parse_python_stack_trace(self, error_log: str, repo_dir: Path) -> List[tuple[str, int, str]]:
+    def _parse_python_stack_trace(self, error_log: str, repo_dir: Path) -> list[tuple[str, int, str]]:
         return [(file, int(line), func) for file, line, func in STACK_FRAME_RE.findall(error_log)]
 
     def _read_file_snippet(self, file_path: Path, line_num: int, context_lines: int = 5) -> str:

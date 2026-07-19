@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from agents.base import AgentRequest, AgentResponse, BaseAgent
 from execution.sandbox import SandboxExecutor
@@ -18,7 +18,7 @@ class TestingAgent(BaseAgent):
             return await self.measure_coverage(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def generate_tests(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def generate_tests(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         repo_dir = Path(context["repo_dir"])
         file_path = repo_dir / params["file"]
         if not file_path.exists():
@@ -40,7 +40,7 @@ class TestingAgent(BaseAgent):
         touched = apply_file_changes(repo_dir, changes)
         return AgentResponse(success=True, result={"files_changed": touched})
 
-    async def measure_coverage(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def measure_coverage(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Runs pytest --cov in the sandbox and parses the real coverage
         percentage out of the output, instead of returning a hardcoded
         placeholder."""

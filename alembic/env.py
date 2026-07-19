@@ -1,18 +1,23 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
 from core.config import settings
 from database.base import Base
+from models.graph import GraphEdge, GraphNode  # noqa: F401
+from models.knowledge import KnowledgeEdge, KnowledgeNode  # noqa: F401
+from models.neis.evolution_roadmap import EvolutionRoadmap, EvolutionRoadmapItem  # noqa: F401
+from models.neis.project_reality import ProjectRealityModel  # noqa: F401
+from models.neis.technology_intel import TechnologyIntel  # noqa: F401
+from models.neis.user_intent import UserIntent  # noqa: F401
+from models.policy import RepositoryPolicy  # noqa: F401
+
 # Import all models so Base.metadata is fully populated for autogenerate.
 from models.repository import Repository  # noqa: F401
 from models.task import Task  # noqa: F401
-from models.graph import GraphNode, GraphEdge  # noqa: F401
-from models.knowledge import KnowledgeNode, KnowledgeEdge  # noqa: F401
-from models.policy import RepositoryPolicy  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

@@ -1,6 +1,5 @@
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import git
@@ -8,12 +7,12 @@ from github import Github  # PyGithub — safe now that our local package is git
 
 
 class RepositoryEngine:
-    def __init__(self, repo_url: str, github_token: Optional[str] = None):
+    def __init__(self, repo_url: str, github_token: str | None = None):
         self.repo_url = repo_url
         self.github_token = github_token
         self.gh = Github(github_token) if github_token else None
         self.working_dir = Path(f"/tmp/nakima_repos/{self._repo_name()}")
-        self.repo: Optional[git.Repo] = None
+        self.repo: git.Repo | None = None
 
     def _repo_name(self) -> str:
         return self.repo_url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -43,7 +42,7 @@ class RepositoryEngine:
             self.repo.heads[branch_name].checkout()
         return self.repo
 
-    async def commit_changes(self, message: str, files: List[str]):
+    async def commit_changes(self, message: str, files: list[str]):
         if not files:
             raise ValueError("commit_changes called with no files to commit")
         self.repo.index.add(files)
@@ -56,12 +55,12 @@ class RepositoryEngine:
         origin.set_url(self._authenticated_url())
         origin.push(refspec=f"{branch_name}:{branch_name}")
 
-    async def get_file_history(self, file_path: str) -> List[Dict]:
+    async def get_file_history(self, file_path: str) -> list[dict]:
         commits = list(self.repo.iter_commits(paths=file_path))
         return [{"hash": c.hexsha, "message": c.message, "author": str(c.author)} for c in commits]
 
-    def get_dependency_graph(self) -> Dict:
-        graph: Dict = {"nodes": [], "edges": []}
+    def get_dependency_graph(self) -> dict:
+        graph: dict = {"nodes": [], "edges": []}
         package_json = self.working_dir / "package.json"
         if package_json.exists():
             import json

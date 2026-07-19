@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from agents.base import AgentRequest, AgentResponse, BaseAgent
 from repository.engine import RepositoryEngine
@@ -13,7 +13,7 @@ class AnalysisAgent(BaseAgent):
             return await self.detect_issues(request.context, request.params)
         return AgentResponse(success=False, error=f"Unknown action: {request.action}")
 
-    async def scan_repository(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def scan_repository(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Clone (or reuse an already-cloned repo_dir) and analyze up to
         `max_files` source files for bugs, security flaws, and architecture
         issues."""
@@ -36,7 +36,7 @@ class AnalysisAgent(BaseAgent):
             results.append({"file": str(file.relative_to(repo_dir)), "insights": analysis.content})
         return AgentResponse(success=True, result={"findings": results, "files_scanned": len(results)})
 
-    async def detect_issues(self, context: Dict[str, Any], params: Dict[str, Any]) -> AgentResponse:
+    async def detect_issues(self, context: dict[str, Any], params: dict[str, Any]) -> AgentResponse:
         """Focused pass for a specific concern (dead code, unused deps,
         technical debt) rather than scan_repository's general analysis."""
         focus = params.get("focus", "dead code and unused dependencies")
