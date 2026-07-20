@@ -36,7 +36,7 @@ tree-sitter-languages==1.10.2
 
 # ─── Observability ───────────────────────────────────────────────────────────
 opentelemetry-api==1.31.1
-opentelemetry-sdk==1.31.1
+opentelemetry-sdk==1.44.0
 prometheus-client==0.21.1
 
 # ─── Graph / analysis helpers ────────────────────────────────────────────────
