@@ -3,7 +3,7 @@
 # Network-disabled at container-run time (see execution/sandbox.py); this
 # image is intentionally not slim, since it needs real toolchains, not
 # just interpreters.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Python toolchain — pin to exact versions for reproducible sandbox
 # security posture; bump here when CVEs surface in these tools.
