@@ -47,3 +47,13 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Python
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.pem
+.pytest_cache/
+*.egg-info/
