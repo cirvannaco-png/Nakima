@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nakima
+          POSTGRES_PASSWORD: nakima
+          POSTGRES_DB: nakima
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://nakima:nakima@localhost:5432/nakima
+      GITHUB_APP_ID: "123456"
+      GITHUB_PRIVATE_KEY: "test-private-key-not-real"
+      GITHUB_WEBHOOK_SECRET: "testsecret"
+      GITHUB_TOKEN: "ghp-test"
+      DEFAULT_AI_PROVIDER: "github"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (flake8)
+        run: flake8 . --max-line-length=120 --exclude=alembic/versions,__pycache__,.git --extend-ignore=E501,W503
+
+      - name: Run migrations
+        run: alembic upgrade head
+
+      - name: Test
+        run: pytest --tb=short -q
+
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t nakima:ci .
+      - name: Build sandbox image
+        run: docker build -f Dockerfile.sandbox -t nakima-sandbox:ci .

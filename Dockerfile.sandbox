@@ -1,0 +1,27 @@
+# Image the SandboxExecutor runs generated code inside for validation.
+# Covers every language in execution/tool_registry.py's matrix.
+# Network-disabled at container-run time (see execution/sandbox.py); this
+# image is intentionally not slim, since it needs real toolchains, not
+# just interpreters.
+FROM python:3.12-slim
+
+# Python toolchain
+RUN pip install --no-cache-dir black flake8 pytest pytest-cov bandit safety
+
+# Node/JS/TS toolchain
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl gnupg ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g prettier eslint typescript \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Go toolchain
+RUN curl -fsSL https://go.dev/dl/go1.22.5.linux-amd64.tar.gz -o /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz \
+    && /usr/local/go/bin/go install golang.org/x/lint/golint@latest 2>/dev/null || true
+ENV PATH="/usr/local/go/bin:${PATH}"
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest || true
+RUN go install github.com/securego/gosec/v2/cmd/gosec@latest || true
+
+WORKDIR /workspace
