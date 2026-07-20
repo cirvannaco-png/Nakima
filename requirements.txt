@@ -24,7 +24,7 @@ PyGithub==2.6.1
 
 # ─── Git operations ──────────────────────────────────────────────────────────
 # gitpython: CVE-2024-22190 fixed in >=3.1.41; pin to latest.
-gitpython==3.1.44
+gitpython==3.1.53
 
 # ─── Container operations ────────────────────────────────────────────────────
 docker==7.1.0
