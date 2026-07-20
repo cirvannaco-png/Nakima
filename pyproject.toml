@@ -24,9 +24,10 @@ optional-dependencies.dev = { file = ["requirements-dev.txt"] }
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
-  "agents*", "api*", "core*", "database*", "execution*", "githubapp*",
-  "memory*", "models*", "monitoring*", "orchestrator*", "planner*",
-  "providers*", "repository*", "security*", "utils*", "validation*",
+  "agents*", "api*", "core*", "database*", "documents*", "execution*",
+  "githubapp*", "intelligence*", "memory*", "models*", "monitoring*",
+  "neis*", "orchestrator*", "planner*", "providers*", "quality*",
+  "reports*", "repository*", "security*", "utils*", "validation*",
 ]
 exclude = ["tests*", "alembic*", "scripts*"]
 

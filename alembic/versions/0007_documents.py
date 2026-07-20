@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("version", sa.Integer, nullable=False),
         sa.Column("extracted_text", sa.Text, nullable=True),
         sa.Column("status", sa.String(20), nullable=False, server_default="processed"),
+        sa.Column("virus_scan_status", sa.String(20), nullable=False, server_default="unavailable"),
         sa.Column("rejection_reason", sa.Text, nullable=True),
         sa.Column("uploaded_at", sa.DateTime, nullable=False),
         sa.Column("raw_bytes", sa.LargeBinary, nullable=True),

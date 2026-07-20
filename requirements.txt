@@ -54,3 +54,13 @@ python-docx==1.1.2
 # (api/v1/endpoints/documents.py) — FastAPI raises at request time
 # without it, not at import time, so it's easy to miss.
 python-multipart==0.0.12
+
+# Client for a ClamAV clamd daemon (security/virus_scanner.py). This is
+# just the client — clamd itself (and freshclam, for definition updates)
+# is a separate system service that has to be running and reachable at
+# CLAMD_HOST for scanning to actually happen; see that module's docstring.
+clamd==1.0.2
+
+# Required by FastAPI's StaticFiles to serve static assets (the command
+# centre dashboard). Without aiofiles, StaticFiles raises at startup.
+aiofiles==24.1.0

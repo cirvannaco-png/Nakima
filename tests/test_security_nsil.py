@@ -276,3 +276,18 @@ async def test_nsil_skips_dast_when_no_target_url_given(db_session, tmp_path, mo
 
     assert "dast" not in result.scanners_run
     assert "dast" not in result.scanners_skipped
+
+
+async def test_nsil_skips_virus_scan_gracefully_without_clamd(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    # No CLAMD_HOST configured (the test-suite default) — this exercises
+    # the real VirusScannerUnavailable path, not a mocked one.
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(tmp_path, include_agent_scanners=False)
+
+    assert "virus" in result.scanners_skipped
+    assert "virus" not in result.scanners_run

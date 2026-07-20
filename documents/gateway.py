@@ -1,31 +1,28 @@
-"""The Project Upload Gateway orchestrator: validate -> extract text ->
-duplicate check -> version -> persist.
+"""The Project Upload Gateway orchestrator: validate -> virus scan ->
+extract text -> duplicate check -> version -> persist.
 
-Two things explicitly out of scope, on purpose rather than by oversight:
+Virus scanning (security/virus_scanner.py) runs a real ClamAV clamd check
+via VirusScanner.scan(). If clamd isn't configured or isn't reachable,
+the scan status is recorded as "unavailable" and the upload proceeds
+anyway (fail-open) — see virus_scanner.py's docstring for why that's the
+right default rather than rejecting every upload the moment this code
+ships, before any operator has deployed clamd. What matters is that
+ProjectDocument.virus_scan_status always reflects what actually happened
+— "unavailable" is never silently reported as "clean".
 
-1. Virus/malware scanning. The EIP spec lists it as a Gateway
-   responsibility, and it's a real gap — FileValidator's magic-byte check
-   confirms a PDF looks like a PDF, it says nothing about whether that
-   PDF is malicious. A production deployment accepting uploads from
-   untrusted users needs a real scanner (ClamAV via clamd, or a cloud AV
-   API) wired in before this gateway is exposed publicly. Nakima has no
-   AV integration anywhere in this codebase, and faking one — a function
-   called `scan_for_viruses` that doesn't actually scan for viruses —
-   would be worse than not having the function at all, since it would
-   look like a safety control that isn't one. This is a genuine
-   before-production gap, not a "nice to have."
-
-2. Turning extracted_text into structured Project DNA fields (functional
-   requirements, constraints, roadmap, business objectives — the
-   "Document Intelligence Engine" outputs from the EIP spec). That's a
-   CognitiveEngine-shaped problem (extraction is a judgment call, not a
-   lookup) that deserves its own prompt design and evaluation, not a
-   rushed addition here. This gateway's job ends at "text is extracted
-   and stored"; a future increment reads ProjectDocument.extracted_text
-   the same way neis/reasoning/decision_engine.py reads
-   ProjectRealityModel and UserIntent today.
+One thing still explicitly out of scope: turning extracted_text into
+structured Project DNA fields (functional requirements, constraints,
+roadmap, business objectives — the "Document Intelligence Engine"
+outputs from the EIP spec). That's a CognitiveEngine-shaped problem
+(extraction is a judgment call, not a lookup) that deserves its own
+prompt design and evaluation, not a rushed addition here. This gateway's
+job ends at "text is extracted and stored"; a future increment reads
+ProjectDocument.extracted_text the same way
+neis/reasoning/decision_engine.py reads ProjectRealityModel and
+UserIntent today.
 """
 
+import asyncio
 import hashlib
 from dataclasses import dataclass
 
@@ -35,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from documents.parsers import extract_text
 from documents.validators import FileValidator
 from models.document import ProjectDocument
+from security.virus_scanner import VirusScanner
 
 
 @dataclass
@@ -48,6 +46,7 @@ class ProjectUploadGateway:
         self.session = session
         self.repository_id = repository_id
         self.validator = FileValidator()
+        self.virus_scanner = VirusScanner()
 
     async def upload(self, filename: str, content: bytes) -> UploadResult:
         content_hash = hashlib.sha256(content).hexdigest()
@@ -69,6 +68,25 @@ class ProjectUploadGateway:
                 version=version,
                 status="rejected",
                 rejection_reason=result.reason,
+                virus_scan_status="unavailable",  # never scanned — rejected on format grounds first
+            )
+            self.session.add(doc)
+            await self.session.commit()
+            await self.session.refresh(doc)
+            return UploadResult(document=doc, is_duplicate=False)
+
+        virus_result = await asyncio.to_thread(self.virus_scanner.scan, content)
+        if virus_result.status == "infected":
+            doc = ProjectDocument(
+                repository_id=self.repository_id,
+                filename=filename,
+                file_type=result.file_type,
+                size_bytes=len(content),
+                content_hash=content_hash,
+                version=version,
+                status="rejected",
+                rejection_reason=f"Virus scan flagged this file: {virus_result.threat_name}",
+                virus_scan_status="infected",
             )
             self.session.add(doc)
             await self.session.commit()
@@ -86,6 +104,7 @@ class ProjectUploadGateway:
             version=version,
             status="processed",
             extracted_text=extracted_text,
+            virus_scan_status=virus_result.status,  # "clean" | "unavailable" | "error"
         )
         self.session.add(doc)
         await self.session.commit()
