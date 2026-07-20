@@ -53,7 +53,7 @@ reportlab==4.4.1
 
 # ─── Document parsing ────────────────────────────────────────────────────────
 # pypdf: CVE-2023-36464 fixed in >=3.1.0; pin to latest.
-pypdf==5.5.0
+pypdf==6.14.2
 # python-docx: no known CVEs; latest stable.
 python-docx==1.1.2
 
