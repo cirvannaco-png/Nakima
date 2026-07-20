@@ -57,3 +57,6 @@ venv/
 *.pem
 .pytest_cache/
 *.egg-info/
+
+# User-uploaded assets — not repo content
+attached_assets/

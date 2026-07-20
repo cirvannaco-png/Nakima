@@ -158,3 +158,5 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.28.1"
+  # GHSA-52cp-r559-cp3m: js-yaml <4.3.0 quadratic CPU (YAML merge-key ReDoS)
+  js-yaml: ">=5.2.1"
