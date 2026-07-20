@@ -8,9 +8,9 @@ tests/test_github_models_provider.py.
 """
 
 import httpx
-import pytest
 
 import security.dast as dast_mod
+import security.ssrf_guard as ssrf_guard_mod
 from security.dast import DASTScanner
 
 
@@ -43,7 +43,7 @@ async def test_cloud_metadata_endpoint_refused():
 
 
 async def test_localhost_hostname_refused(monkeypatch):
-    monkeypatch.setattr(dast_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("127.0.0.1", 0))])
+    monkeypatch.setattr(ssrf_guard_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("127.0.0.1", 0))])
     findings = await DASTScanner().scan("http://localhost/")
     assert findings[0].rule == "dast_target_refused"
 
@@ -54,7 +54,7 @@ async def test_unresolvable_hostname_refused(monkeypatch):
     def _raise(*a, **kw):
         raise real_socket.gaierror("Name or service not known")
 
-    monkeypatch.setattr(dast_mod.socket, "getaddrinfo", _raise)
+    monkeypatch.setattr(ssrf_guard_mod.socket, "getaddrinfo", _raise)
     findings = await DASTScanner().scan("http://this-does-not-resolve.invalid/")
     assert findings[0].rule == "dast_target_refused"
     assert "didn't resolve" in findings[0].detail
@@ -67,7 +67,7 @@ async def test_unresolvable_hostname_refused(monkeypatch):
 
 def _patch_public_dns(monkeypatch):
     monkeypatch.setattr(
-        dast_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("93.184.216.34", 0))]
+        ssrf_guard_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("93.184.216.34", 0))]
     )
 
 

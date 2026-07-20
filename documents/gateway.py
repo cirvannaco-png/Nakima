@@ -22,7 +22,6 @@ neis/reasoning/decision_engine.py reads ProjectRealityModel and
 UserIntent today.
 """
 
-import asyncio
 import hashlib
 from dataclasses import dataclass
 
@@ -75,7 +74,7 @@ class ProjectUploadGateway:
             await self.session.refresh(doc)
             return UploadResult(document=doc, is_duplicate=False)
 
-        virus_result = await asyncio.to_thread(self.virus_scanner.scan, content)
+        virus_result = self.virus_scanner.scan(content)
         if virus_result.status == "infected":
             doc = ProjectDocument(
                 repository_id=self.repository_id,

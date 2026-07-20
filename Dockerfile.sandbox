@@ -5,8 +5,15 @@
 # just interpreters.
 FROM python:3.12-slim
 
-# Python toolchain
-RUN pip install --no-cache-dir black flake8 pytest pytest-cov bandit safety
+# Python toolchain — pin to exact versions for reproducible sandbox
+# security posture; bump here when CVEs surface in these tools.
+RUN pip install --no-cache-dir \
+    black==25.1.0 \
+    flake8==7.2.0 \
+    pytest==8.3.5 \
+    pytest-cov==6.1.0 \
+    bandit==1.8.5 \
+    safety==3.5.1
 
 # Node/JS/TS toolchain
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,4 +31,9 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest || true
 RUN go install github.com/securego/gosec/v2/cmd/gosec@latest || true
 
+# Security: run as non-root inside sandbox too
+RUN groupadd --gid 1001 sandbox && \
+    useradd --uid 1001 --gid sandbox --no-create-home sandbox
+
 WORKDIR /workspace
+USER sandbox

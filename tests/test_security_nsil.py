@@ -291,3 +291,53 @@ async def test_nsil_skips_virus_scan_gracefully_without_clamd(db_session, tmp_pa
 
     assert "virus" in result.scanners_skipped
     assert "virus" not in result.scanners_run
+
+
+async def test_nsil_pentest_requires_target_url_to_do_anything(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    # run_pentest_simulator=True with no target_url — a flag with nothing
+    # to point it at does nothing, doesn't crash.
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(
+        tmp_path, include_agent_scanners=False, run_pentest_simulator=True
+    )
+    assert "pentest" not in result.scanners_run
+    assert "pentest" not in result.scanners_skipped
+
+
+async def test_nsil_runs_pentest_simulator_when_both_flags_set(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    # Loopback target — SSRF guard refuses it, which surfaces as a
+    # (low-severity) finding, proving the pentest path actually ran
+    # rather than being silently skipped.
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(
+        tmp_path, include_agent_scanners=False, target_url="http://127.0.0.1:8000/", run_pentest_simulator=True
+    )
+    assert "pentest" in result.scanners_run
+    assert "dast" in result.scanners_run
+
+
+async def test_nsil_dast_alone_does_not_run_pentest(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    # target_url given, run_pentest_simulator NOT set — DAST alone should
+    # run without pulling in the more invasive pentest checks by default.
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(
+        tmp_path, include_agent_scanners=False, target_url="http://127.0.0.1:8000/"
+    )
+    assert "dast" in result.scanners_run
+    assert "pentest" not in result.scanners_run
+    assert "pentest" not in result.scanners_skipped
