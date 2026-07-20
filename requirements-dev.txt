@@ -7,4 +7,4 @@ httpx==0.28.1
 # SAST / linting
 bandit==1.8.5
 ruff==0.9.10
-flake8==7.2.0
+flake8==7.3.0
