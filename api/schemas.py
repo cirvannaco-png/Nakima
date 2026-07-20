@@ -91,6 +91,7 @@ class ReportResponse(BaseModel):
 
 class SecurityScanRequest(BaseModel):
     github_token: str | None = None
+    target_url: str | None = None
 
 
 class SecurityFindingResponse(BaseModel):
@@ -114,6 +115,20 @@ class SecurityScanResponse(BaseModel):
     resolved_finding_count: int
     scanners_run: list[str]
     scanners_skipped: list[str]
+
+
+class DocumentResponse(BaseModel):
+    id: str
+    repository_id: int
+    filename: str
+    file_type: str
+    size_bytes: int
+    version: int
+    status: str
+    rejection_reason: str | None
+    extracted_text_preview: str | None
+    is_duplicate: bool = False
+    uploaded_at: str
 
 
 class NEISAnalyzeRequest(BaseModel):

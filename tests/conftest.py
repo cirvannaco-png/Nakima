@@ -23,6 +23,7 @@ async def db_session():
     from models.neis.user_intent import UserIntent  # noqa: F401
     from models.policy import RepositoryPolicy  # noqa: F401
     from models.report import EngineeringReport  # noqa: F401
+    from models.document import ProjectDocument  # noqa: F401
     from models.security import SecurityFinding  # noqa: F401
 
     # Import every model so Base.metadata is fully populated before create_all.

@@ -1,18 +1,17 @@
 """Nakima Security Intelligence Layer — the orchestrator from the EIP
 spec's NSIL proposal. Runs Secret Detection and Configuration Security
 locally (pure Python, no sandbox needed — see security/secret_scanner.py
-and security/config_scanner.py), and SAST + Dependency Audit via
-SecurityAgent (which needs Docker; see agents/security_agent.py). Persists
+and security/config_scanner.py), SAST + Dependency Audit via
+SecurityAgent (which needs Docker; see agents/security_agent.py), and
+optionally DAST (security/dast.py) against a live target URL. Persists
 every finding with a stable fingerprint so re-scans can tell "still open"
 apart from "newly resolved" instead of treating each scan as an unrelated
 snapshot — this is the Security Regression Testing concept from the spec.
 
-What this deliberately does not do: Dynamic Security Testing (DAST) or the
-Penetration Testing Simulator. Both need something to actually execute the
-target application against, and nothing in Nakima's pipeline runs a
-target app today (the sandbox executes tests/builds, not a live server) —
-building that is a materially bigger, separate piece of work, not an
-extension of what's here.
+What this deliberately does not do: the Penetration Testing Simulator —
+active exploitation (SSRF, injection, auth bypass, business logic abuse)
+rather than DAST's observational checks. See security/dast.py's docstring
+for the reasoning; it isn't a difficulty gap, it's a scoping decision.
 """
 
 import logging
@@ -27,6 +26,7 @@ from agents.base import AgentRequest
 from agents.security_agent import SecurityAgent
 from models.security import SecurityFinding, fingerprint
 from security.config_scanner import ConfigSecurityScanner
+from security.dast import DASTScanner
 from security.risk_scoring import RiskScorer
 from security.secret_scanner import SecretScanner
 
@@ -50,7 +50,27 @@ class SecurityIntelligenceLayer:
         self.repository_id = repository_id
         self.risk_scorer = RiskScorer()
 
-    async def scan(self, repo_dir: Path) -> NSILResult:
+    async def scan(
+        self, repo_dir: Path, include_agent_scanners: bool = True, target_url: str | None = None
+    ) -> NSILResult:
+        """`include_agent_scanners=False` skips SAST (bandit) and
+        Dependency Audit (safety) — used by orchestrator/workflow.py's
+        per-task Security Gate, where ValidationPipeline's 'security'
+        stage (execution/tool_registry.py) already runs both of those
+        tools as a blocking check on every task. Running them a second
+        time here would just re-invoke bandit/safety redundantly. The
+        on-demand `POST /security/{repo}/scan` endpoint calls with the
+        default `True` to get full NSIL coverage including SAST and
+        dependency findings tracked with regression history, which the
+        validation pipeline's pass/fail result doesn't provide.
+
+        `target_url`, if given, runs DAST against it — observational
+        checks only (security/dast.py), never requested unless the
+        caller explicitly provides a URL. There's no default target and
+        no crawling to discover one; a URL only gets hit if a caller
+        passed it in, same explicit-opt-in posture as
+        include_agent_scanners.
+        """
         repo_dir = Path(repo_dir)
         scanners_run: list[str] = []
         scanners_skipped: list[str] = []
@@ -81,12 +101,30 @@ class SecurityIntelligenceLayer:
             }
         scanners_run.append("config_security")
 
-        try:
-            agent = SecurityAgent()
-        except Exception as e:
-            logger.warning(f"NSIL: no AI provider configured, skipping agent-backed scanners: {e}")
-            agent = None
-            scanners_skipped.extend(["sast", "dependency_audit"])
+        if target_url:
+            try:
+                for dast_finding in await DASTScanner().scan(target_url):
+                    fp = fingerprint("dast", dast_finding.rule, target_url, None)
+                    current[fp] = {
+                        "source": "dast",
+                        "rule": dast_finding.rule,
+                        "severity": dast_finding.severity,
+                        "file_path": target_url,
+                        "line_number": None,
+                        "detail": dast_finding.detail,
+                    }
+                scanners_run.append("dast")
+            except Exception as e:
+                logger.warning(f"NSIL: DAST scan against {target_url} failed unexpectedly, skipping: {e}")
+                scanners_skipped.append("dast")
+
+        agent = None
+        if include_agent_scanners:
+            try:
+                agent = SecurityAgent()
+            except Exception as e:
+                logger.warning(f"NSIL: no AI provider configured, skipping agent-backed scanners: {e}")
+                scanners_skipped.extend(["sast", "dependency_audit"])
 
         if agent is not None:
             for source, action, mapper in (

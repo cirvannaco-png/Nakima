@@ -19,15 +19,45 @@ from neis.reasoning.arbitration_engine import DriftVerdict
 from neis.reasoning.decision_engine import DecisionEngine
 from planner.context_builder import ContextBuilder
 from planner.planner import PlanningEngine
+from quality.gate import QualityGate
 from repository.analysis import RepositoryAnalyzer
 from repository.engine import RepositoryEngine
 from repository.graph_builder import GraphBuilder
+from security.nsil import SecurityIntelligenceLayer
 from security.policy_checker import PolicyChecker
 from validation.pipeline import ValidationPipeline
 
 logger = logging.getLogger(__name__)
 
 MAX_VALIDATION_RETRIES = 3
+
+
+def security_gate_should_block(nsil_result) -> bool:
+    """The Security Gate's actual decision rule, pulled out of
+    _run_pipeline so it's testable without mocking the entire pipeline
+    (clone/plan/generate/validate/push/PR) just to exercise one if
+    statement. Currently: any critical-severity open finding blocks.
+    """
+    return nsil_result.counts_by_severity.get("critical", 0) > 0
+
+
+def build_verification_summary(drift_result, nsil_result, quality_result) -> str:
+    """Consolidates the outcome of all three gates that ran before this
+    point (Intent Drift, Security, Quality) into one line logged as the
+    final EngineeringDecision right before a PR is opened — the
+    Verification Gate from the spec's four mandatory gates. This is a
+    synthesis of decisions already made and separately recorded, not a
+    fourth independent check; nothing here can change what already
+    happened, since a BLOCK from either earlier gate already returned out
+    of _run_pipeline before this function is ever called.
+    """
+    return (
+        f"Intent: {drift_result.verdict.value}; "
+        f"Security: {'blocked' if security_gate_should_block(nsil_result) else 'approved'} "
+        f"(score {nsil_result.score:.0f}/100, {nsil_result.counts_by_severity.get('critical', 0)} critical); "
+        f"Quality: {quality_result.verdict.value}"
+        + ("" if quality_result.has_test_changes else " (no test files touched)")
+    )
 
 
 class WorkflowOrchestrator:
@@ -277,6 +307,62 @@ class WorkflowOrchestrator:
             await self._fail_task(task_id, f"Policy violations: {'; '.join(violations)}")
             return
 
+        # 6.5. Security Gate — NSIL secret + configuration scan. SAST and
+        # dependency vulnerabilities are already a blocking part of step 5
+        # above (ValidationPipeline's 'security' stage runs bandit/safety);
+        # this covers the two NSIL checks that stage doesn't: hardcoded
+        # secrets and Dockerfile/workflow misconfigurations. Findings are
+        # persisted the same way an on-demand scan's are, so
+        # GET /security/{repo}/findings and the PDF report's Security
+        # section reflect every task's changes, not just explicit scans.
+        async with AsyncSessionLocal() as session:
+            nsil_result = await SecurityIntelligenceLayer(session, repo.id).scan(
+                engine.working_dir, include_agent_scanners=False
+            )
+            await DecisionRegistry(session, repo.id).record(
+                context=f"Security Gate for issue #{issue['number']}: {issue['title']}",
+                problem="Secret and configuration security scan of the working tree before push.",
+                decision=(
+                    "Blocked"
+                    if security_gate_should_block(nsil_result)
+                    else "Approved"
+                ),
+                justification=(
+                    f"Security score {nsil_result.score:.0f}/100; "
+                    f"{nsil_result.counts_by_severity.get('critical', 0)} critical, "
+                    f"{nsil_result.counts_by_severity.get('high', 0)} high open finding(s); "
+                    f"{nsil_result.new_finding_count} new, {nsil_result.resolved_finding_count} resolved this scan."
+                ),
+                related_files=changed_files,
+                related_issues=[str(issue["number"])],
+            )
+
+        if security_gate_should_block(nsil_result):
+            await self._fail_task(
+                task_id,
+                f"Blocked by Security Gate: {nsil_result.counts_by_severity['critical']} critical finding(s) — "
+                f"see GET /security/{repo_full_name}/findings",
+            )
+            return
+        # High/medium/low findings don't block — they're recorded above
+        # and surfaced in the PDF report's Security section, same
+        # approve-with-a-recorded-warning posture as Intent Drift's WARN.
+
+        # 6.7. Quality Gate — deterministic test-coverage-touch signal.
+        # WARN-only by design (see quality/gate.py for why this doesn't
+        # try to guess "the" test file for a given source file); it never
+        # blocks, only records, same posture as any other WARN verdict.
+        quality_result = QualityGate().evaluate(changed_files)
+        async with AsyncSessionLocal() as session:
+            await DecisionRegistry(session, repo.id).record(
+                context=f"Quality Gate for issue #{issue['number']}: {issue['title']}",
+                problem="Test-coverage-touch signal for the changed files.",
+                decision=quality_result.verdict.value,
+                justification="; ".join(quality_result.reasoning),
+                related_files=changed_files,
+                related_issues=[str(issue["number"])],
+            )
+
         # 7. Commit + push
         await engine.commit_changes(f"feat: {issue['title']}", changed_files)
         await engine.push_branch(branch)
@@ -297,13 +383,22 @@ class WorkflowOrchestrator:
             task.pr_url = pr.html_url
             await session.commit()
 
+            await DecisionRegistry(session, repo.id).record(
+                context=f"Verification Gate for issue #{issue['number']}: {issue['title']}",
+                problem="Final synthesis of Intent, Security, and Quality gate outcomes before PR open.",
+                decision=f"PR opened: {pr.html_url}",
+                justification=build_verification_summary(drift_result, nsil_result, quality_result),
+                related_files=changed_files,
+                related_issues=[str(issue["number"])],
+            )
+
             await EventLog(session, repo.id).record(
                 task_id=uuid.UUID(task_id),
                 task_description=issue["title"],
                 reason=issue.get("body") or issue["title"],
                 chosen_solution=str(plan["steps"]),
                 files_modified=changed_files,
-                tests_executed=["format", "lint", "build", "test", "security"],
+                tests_executed=["format", "lint", "build", "test", "security", "security_gate", "quality_gate"],
                 risk_level="low" if len(changed_files) <= 3 else "medium",
                 verification_status="passed",
                 dependencies_affected=[],
