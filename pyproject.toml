@@ -4,16 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nakima"
-version = "0.1.0"
-description = "Autonomous GitHub App that plans, generates, validates and opens PRs from issues."
+version = "1.0.0"
+description = "Autonomous AI-powered GitHub App: plans, generates, validates, and opens PRs from issues."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [{ name = "Nakima Contributors" }]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
   "Framework :: FastAPI",
-  "License :: OSI Approved :: MIT License",
+  "License :: Other/Proprietary License",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Security",
 ]
 dynamic = ["dependencies", "optional-dependencies"]
 
@@ -37,9 +41,13 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP"]
-ignore = ["E501"]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["E501", "S101", "S603", "S607"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "alembic/versions"]
+skips = ["B101"]

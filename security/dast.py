@@ -21,14 +21,14 @@ same reason: a safe-looking URL could redirect somewhere the check above
 never validated.
 """
 
-import ipaddress
 import logging
 import re
-import socket
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import httpx
+
+from security.ssrf_guard import unsafe_target_reason
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class DASTScanner:
                 )
             ]
 
-        unsafe_reason = self._unsafe_target_reason(parsed.hostname)
+        unsafe_reason = unsafe_target_reason(parsed.hostname)
         if unsafe_reason:
             return [
                 DASTFinding(
@@ -122,20 +122,6 @@ class DASTScanner:
             )
 
         return findings
-
-    def _unsafe_target_reason(self, hostname: str | None) -> str | None:
-        if not hostname:
-            return "no hostname in the URL"
-        try:
-            resolved = {info[4][0] for info in socket.getaddrinfo(hostname, None)}
-        except socket.gaierror as e:
-            return f"hostname didn't resolve ({e})"
-
-        for ip_str in resolved:
-            ip = ipaddress.ip_address(ip_str)
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-                return f"resolves to {ip_str}, a private/loopback/link-local/reserved address"
-        return None
 
     def _check_headers(self, response: httpx.Response) -> list[DASTFinding]:
         findings = []

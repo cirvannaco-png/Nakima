@@ -15,6 +15,7 @@ from models.repository import Repository
 from models.security import SecurityFinding
 from repository.engine import RepositoryEngine
 from security.nsil import SecurityIntelligenceLayer
+from security.target_binding import RepoTargetBinding, TargetBindingError
 
 router = APIRouter()
 
@@ -35,10 +36,38 @@ async def run_security_scan(
 ):
     repo = await _get_repository_or_404(db, repo_full_name)
 
+    if req.run_pentest_simulator and not req.target_url:
+        raise HTTPException(status_code=400, detail="run_pentest_simulator requires target_url to also be set.")
+
+    if req.target_url:
+        # DAST (and, when built, the Pentest Simulator) fires a real
+        # outbound request at target_url — see security/target_binding.py
+        # for why "the user typed a URL" isn't authorization on its own.
+        # Requires the GitHub token so the binding check can look at what
+        # this specific repo actually has on record, not what the caller
+        # merely asserts.
+        if not req.github_token:
+            raise HTTPException(
+                status_code=400, detail="github_token is required when target_url is supplied — see security/target_binding.py."
+            )
+        try:
+            authorized = await RepoTargetBinding(repo_full_name, req.github_token).is_authorized(req.target_url)
+        except TargetBindingError as e:
+            raise HTTPException(status_code=502, detail=f"Couldn't verify target ownership: {e}") from None
+        if not authorized:
+            raise HTTPException(
+                status_code=403,
+                detail=f"{req.target_url} isn't associated with {repo_full_name} on GitHub (checked homepage, "
+                "Pages, and deployment records) — refusing to scan a target this repository doesn't "
+                "actually own.",
+            )
+
     engine = RepositoryEngine(f"https://github.com/{repo_full_name}.git", req.github_token)
     await engine.clone()
 
-    result = await SecurityIntelligenceLayer(db, repo.id).scan(engine.working_dir, target_url=req.target_url)
+    result = await SecurityIntelligenceLayer(db, repo.id).scan(
+        engine.working_dir, target_url=req.target_url, run_pentest_simulator=req.run_pentest_simulator
+    )
     return SecurityScanResponse(
         score=result.score,
         counts_by_severity=result.counts_by_severity,

@@ -1,0 +1,88 @@
+NAKIMA PROPRIETARY LICENSE
+Version 1.0 — Effective Date: July 20, 2026
+
+Copyright (c) 2026 Nakima Contributors. All rights reserved.
+
+──────────────────────────────────────────────────────────────────────────────
+PREAMBLE
+──────────────────────────────────────────────────────────────────────────────
+
+This software ("Nakima") is proprietary. The source code is made available
+for reference and audit purposes only. You may not use this source code to
+operate, host, or build a competing service, product, or derivative work.
+
+You ARE permitted to use the Nakima GitHub App (the hosted service at
+https://github.com/apps/nakima, once publicly launched) under the separate
+Terms of Service published at that URL.
+
+──────────────────────────────────────────────────────────────────────────────
+GRANT OF RIGHTS
+──────────────────────────────────────────────────────────────────────────────
+
+Subject to the restrictions below, you are granted a limited, non-exclusive,
+non-transferable, royalty-free right to:
+
+  1. READ this source code for personal educational or security-audit
+     purposes only.
+
+  2. USE the hosted Nakima GitHub App service once it is publicly launched,
+     subject to the service's separate Terms of Service.
+
+  3. CONTRIBUTE to this repository via pull requests, subject to the
+     Contributor License Agreement below.
+
+──────────────────────────────────────────────────────────────────────────────
+RESTRICTIONS — YOU MAY NOT
+──────────────────────────────────────────────────────────────────────────────
+
+  a. Copy, reproduce, distribute, publish, or sublicense this source code or
+     any substantial portion of it, in source or compiled form, with or
+     without modification.
+
+  b. Deploy, host, or operate any service, application, or product derived
+     from or substantially similar to this source code.
+
+  c. Remove or alter any copyright, licence, or proprietary notice contained
+     in this source code.
+
+  d. Use this source code or any derivative to train, fine-tune, or distil
+     any machine-learning model.
+
+  e. Reverse-engineer the compiled form of any Nakima service for purposes
+     beyond those explicitly permitted above.
+
+  f. Sublicense, sell, rent, lease, or otherwise transfer any rights granted
+     under this Licence.
+
+──────────────────────────────────────────────────────────────────────────────
+CONTRIBUTOR LICENSE AGREEMENT
+──────────────────────────────────────────────────────────────────────────────
+
+By submitting a pull request or other contribution to this repository, you:
+
+  1. Confirm that you have the right to grant, and hereby grant, to Nakima
+     Contributors an irrevocable, worldwide, royalty-free licence to use,
+     reproduce, modify, and distribute your contribution as part of this
+     project under any licence the project maintainers choose.
+
+  2. Acknowledge that your contribution becomes subject to this Licence.
+
+──────────────────────────────────────────────────────────────────────────────
+DISCLAIMER
+──────────────────────────────────────────────────────────────────────────────
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+──────────────────────────────────────────────────────────────────────────────
+CONTACT
+──────────────────────────────────────────────────────────────────────────────
+
+For licensing enquiries, commercial arrangements, or partnership discussions,
+open an issue at https://github.com/cirvannaco-png/Nakima or contact the
+maintainers through the GitHub profile.

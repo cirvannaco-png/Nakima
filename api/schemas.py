@@ -92,6 +92,7 @@ class ReportResponse(BaseModel):
 class SecurityScanRequest(BaseModel):
     github_token: str | None = None
     target_url: str | None = None
+    run_pentest_simulator: bool = False
 
 
 class SecurityFindingResponse(BaseModel):
@@ -128,7 +129,6 @@ class DocumentResponse(BaseModel):
     rejection_reason: str | None
     extracted_text_preview: str | None
     is_duplicate: bool = False
-    virus_scan_status: str = "unavailable"
     uploaded_at: str
 
 

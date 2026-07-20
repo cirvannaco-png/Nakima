@@ -3,18 +3,20 @@ spec's NSIL proposal. Runs Secret Detection and Configuration Security
 locally (pure Python, no sandbox needed — see security/secret_scanner.py
 and security/config_scanner.py), SAST + Dependency Audit via
 SecurityAgent (which needs Docker; see agents/security_agent.py), and
-optionally DAST (security/dast.py) against a live target URL. Persists
+optionally DAST (security/dast.py) and the Pentest Simulator
+(security/pentest_simulator.py) against a live target URL. Persists
 every finding with a stable fingerprint so re-scans can tell "still open"
 apart from "newly resolved" instead of treating each scan as an unrelated
 snapshot — this is the Security Regression Testing concept from the spec.
 
-What this deliberately does not do: the Penetration Testing Simulator —
-active exploitation (SSRF, injection, auth bypass, business logic abuse)
-rather than DAST's observational checks. See security/dast.py's docstring
-for the reasoning; it isn't a difficulty gap, it's a scoping decision.
+The Pentest Simulator is gated more conservatively than DAST: it requires
+both target_url AND run_pentest_simulator=True (DAST alone only needs
+target_url) — active exploitation checks shouldn't run just because a URL
+was supplied for a read-only scan. The API layer additionally requires
+GitHub ownership verification (security/target_binding.py) whenever
+target_url is set at all, covering both.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -28,6 +30,7 @@ from agents.security_agent import SecurityAgent
 from models.security import SecurityFinding, fingerprint
 from security.config_scanner import ConfigSecurityScanner
 from security.dast import DASTScanner
+from security.pentest_simulator import PentestSimulator
 from security.risk_scoring import RiskScorer
 from security.secret_scanner import SecretScanner
 from security.virus_scanner import VirusScanner, VirusScannerUnavailable
@@ -53,7 +56,11 @@ class SecurityIntelligenceLayer:
         self.risk_scorer = RiskScorer()
 
     async def scan(
-        self, repo_dir: Path, include_agent_scanners: bool = True, target_url: str | None = None
+        self,
+        repo_dir: Path,
+        include_agent_scanners: bool = True,
+        target_url: str | None = None,
+        run_pentest_simulator: bool = False,
     ) -> NSILResult:
         """`include_agent_scanners=False` skips SAST (bandit) and
         Dependency Audit (safety) — used by orchestrator/workflow.py's
@@ -72,6 +79,11 @@ class SecurityIntelligenceLayer:
         no crawling to discover one; a URL only gets hit if a caller
         passed it in, same explicit-opt-in posture as
         include_agent_scanners.
+
+        `run_pentest_simulator=True` additionally runs the Pentest
+        Simulator (security/pentest_simulator.py) against target_url —
+        active, if non-destructive, checks. Requires target_url to also
+        be set; a pentest flag with no target does nothing.
         """
         repo_dir = Path(repo_dir)
         scanners_run: list[str] = []
@@ -104,9 +116,7 @@ class SecurityIntelligenceLayer:
         scanners_run.append("config_security")
 
         try:
-            scanner = VirusScanner()
-            virus_findings = await asyncio.to_thread(scanner.scan_directory, repo_dir)
-            for virus_finding in virus_findings:
+            for virus_finding in VirusScanner().scan_directory(repo_dir):
                 fp = fingerprint("virus", virus_finding.threat_name, virus_finding.file_path, None)
                 current[fp] = {
                     "source": "virus",
@@ -137,6 +147,23 @@ class SecurityIntelligenceLayer:
             except Exception as e:
                 logger.warning(f"NSIL: DAST scan against {target_url} failed unexpectedly, skipping: {e}")
                 scanners_skipped.append("dast")
+
+            if run_pentest_simulator:
+                try:
+                    for pentest_finding in await PentestSimulator().scan(target_url):
+                        fp = fingerprint("pentest", pentest_finding.rule, target_url, None)
+                        current[fp] = {
+                            "source": "pentest",
+                            "rule": pentest_finding.rule,
+                            "severity": pentest_finding.severity,
+                            "file_path": target_url,
+                            "line_number": None,
+                            "detail": pentest_finding.detail,
+                        }
+                    scanners_run.append("pentest")
+                except Exception as e:
+                    logger.warning(f"NSIL: Pentest scan against {target_url} failed unexpectedly, skipping: {e}")
+                    scanners_skipped.append("pentest")
 
         agent = None
         if include_agent_scanners:
