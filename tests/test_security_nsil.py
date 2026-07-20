@@ -246,3 +246,33 @@ async def test_nsil_reopens_a_previously_resolved_finding(db_session, tmp_path, 
 
     assert third.new_finding_count == 0  # same fingerprint, reopened not re-created
     assert third.total_open == 1
+
+
+async def test_nsil_runs_dast_when_target_url_given_and_refuses_unsafe_targets(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(
+        tmp_path, include_agent_scanners=False, target_url="http://127.0.0.1:8000/"
+    )
+
+    assert "dast" in result.scanners_run
+    # The SSRF guard refuses the loopback target, which shows up as a
+    # (low-severity) finding rather than a crash or a silent no-op.
+    assert result.total_open == 1
+
+
+async def test_nsil_skips_dast_when_no_target_url_given(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "security.nsil.SecurityAgent",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("no provider configured in tests")),
+    )
+    repo = await _make_repo(db_session)
+
+    result = await SecurityIntelligenceLayer(db_session, repo.id).scan(tmp_path, include_agent_scanners=False)
+
+    assert "dast" not in result.scanners_run
+    assert "dast" not in result.scanners_skipped

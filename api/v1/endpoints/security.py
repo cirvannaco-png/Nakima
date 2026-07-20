@@ -38,7 +38,7 @@ async def run_security_scan(
     engine = RepositoryEngine(f"https://github.com/{repo_full_name}.git", req.github_token)
     await engine.clone()
 
-    result = await SecurityIntelligenceLayer(db, repo.id).scan(engine.working_dir)
+    result = await SecurityIntelligenceLayer(db, repo.id).scan(engine.working_dir, target_url=req.target_url)
     return SecurityScanResponse(
         score=result.score,
         counts_by_severity=result.counts_by_severity,

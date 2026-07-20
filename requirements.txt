@@ -42,3 +42,15 @@ packaging==24.1
 # libcairo/pango dependency) — matters for the same minimal-deploy-target
 # reasons already documented around SANDBOX_IMAGE and Cirvanna's GCE choice.
 reportlab==4.2.5
+
+# Project Upload Gateway document parsing (documents/parsers.py). Both
+# pure Python, no system deps — pypdf for the same reason pdf-reading
+# workflows generally prefer it for basic text extraction over shelling
+# out to poppler-utils; python-docx is the standard library for .docx.
+pypdf==5.0.1
+python-docx==1.1.2
+
+# Required by FastAPI for UploadFile / multipart form handling
+# (api/v1/endpoints/documents.py) — FastAPI raises at request time
+# without it, not at import time, so it's easy to miss.
+python-multipart==0.0.12
