@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nakima — Engineering Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:            #0A0D12;
+    --ink-raised:     #12161D;
+    --ink-raised-2:   #171C25;
+    --ink-line:       #232A35;
+    --ink-line-soft:  #1A2029;
+    --text-primary:   #E7EAEE;
+    --text-secondary: #9AA5B4;
+    --text-dim:       #5B6472;
+
+    --signal-cyan:    #4FD8C4;
+    --signal-cyan-dim:#1E3A36;
+    --signal-amber:   #E8A94C;
+    --signal-amber-dim:#3A2E18;
+    --signal-red:     #E85D5D;
+    --signal-red-dim: #3A1C1C;
+    --signal-violet:  #A78BFA;
+    --signal-violet-dim:#2A2340;
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body:    'IBM Plex Sans', sans-serif;
+    --font-mono:    'IBM Plex Mono', monospace;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ scroll-behavior:smooth; }
+
+  body{
+    background:
+      radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(79,216,196,0.06), transparent),
+      radial-gradient(ellipse 900px 500px at 100% 10%, rgba(167,139,250,0.05), transparent),
+      repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+      var(--ink);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    font-size:14px;
+    line-height:1.5;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  a{ color:inherit; text-decoration:none; }
+  ::selection{ background:var(--signal-cyan-dim); color:var(--signal-cyan); }
+
+  /* ---------- Layout shell ---------- */
+  .shell{
+    display:grid;
+    grid-template-columns:232px 1fr;
+    min-height:100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    border-right:1px solid var(--ink-line);
+    padding:22px 16px;
+    position:sticky; top:0; height:100vh;
+    display:flex; flex-direction:column;
+    background:rgba(255,255,255,0.008);
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    padding:4px 8px 22px 8px;
+    border-bottom:1px solid var(--ink-line);
+    margin-bottom:18px;
+  }
+  .brand-mark{
+    width:28px; height:28px; border-radius:7px;
+    background:linear-gradient(135deg, var(--signal-cyan), var(--signal-violet));
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:700; font-size:14px; color:#0A0D12;
+    flex-shrink:0;
+  }
+  .brand-text{ font-family:var(--font-display); font-weight:600; font-size:15.5px; letter-spacing:0.2px; }
+  .brand-sub{ font-family:var(--font-mono); font-size:10px; color:var(--text-dim); letter-spacing:0.5px; text-transform:uppercase; margin-top:1px; }
+
+  .nav-group-label{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--text-dim); padding:14px 10px 8px;
+  }
+  .nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 10px; border-radius:6px;
+    font-size:13px; color:var(--text-secondary);
+    cursor:pointer; transition:background .12s, color .12s;
+    border:1px solid transparent;
+  }
+  .nav-item:hover{ background:rgba(255,255,255,0.03); color:var(--text-primary); }
+  .nav-item.active{
+    background:rgba(79,216,196,0.07);
+    border-color:rgba(79,216,196,0.18);
+    color:var(--signal-cyan);
+  }
+  .nav-icon{ width:15px; height:15px; flex-shrink:0; opacity:0.85; }
+  .nav-item .kbd{
+    margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+    border:1px solid var(--ink-line); border-radius:4px; padding:1px 5px;
+  }
+
+  .sidebar-footer{
+    margin-top:auto; padding-top:16px; border-top:1px solid var(--ink-line);
+  }
+  .repo-card{
+    display:flex; align-items:center; gap:9px;
+    padding:9px 10px; border-radius:8px;
+    background:var(--ink-raised); border:1px solid var(--ink-line);
+    font-size:12.5px;
+  }
+  .repo-avatar{
+    width:22px; height:22px; border-radius:5px; background:var(--ink-line-soft);
+    display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--text-dim); flex-shrink:0;
+  }
+  .repo-name{ font-family:var(--font-mono); font-size:12px; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .repo-branch{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); }
+
+  /* ---------- Main ---------- */
+  .main{ padding:26px 36px 80px; max-width:1180px; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:26px; gap:20px; flex-wrap:wrap;
+  }
+  .topbar-title{ font-family:var(--font-display); font-size:22px; font-weight:600; letter-spacing:-0.2px; }
+  .topbar-meta{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin-top:3px; }
+  .topbar-meta .dot{ color:var(--signal-cyan); }
+
+  /* Gate status strip — the four mandatory quality gates */
+  .gate-strip{ display:flex; gap:10px; }
+  .gate-chip{
+    display:flex; align-items:center; gap:7px;
+    padding:8px 12px; border-radius:8px;
+    border:1px solid var(--ink-line); background:var(--ink-raised);
+    font-family:var(--font-mono); font-size:11.5px;
+  }
+  .gate-chip .label{ color:var(--text-dim); }
+  .gate-chip .state{ font-weight:600; letter-spacing:0.3px; }
+  .gate-dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .gate-dot.approve{ background:var(--signal-cyan); box-shadow:0 0 8px rgba(79,216,196,0.6); }
+  .gate-dot.warn{ background:var(--signal-amber); box-shadow:0 0 8px rgba(232,169,76,0.5); }
+  .gate-dot.block{ background:var(--signal-red); box-shadow:0 0 8px rgba(232,93,93,0.5); }
+  .state.approve{ color:var(--signal-cyan); } .state.warn{ color:var(--signal-amber); } .state.block{ color:var(--signal-red); }
+
+  section{ margin-bottom:34px; scroll-margin-top:24px; }
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+  .section-eyebrow{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:1.4px; text-transform:uppercase;
+    color:var(--signal-cyan); margin-bottom:5px; display:block;
+  }
+  .section-title{ font-family:var(--font-display); font-size:18px; font-weight:600; }
+  .section-desc{ font-size:12.5px; color:var(--text-secondary); margin-top:4px; max-width:560px; }
+
+  .panel{
+    background:var(--ink-raised); border:1px solid var(--ink-line); border-radius:12px;
+    padding:20px;
+  }
+
+  /* ---------- SIGNATURE: Reasoning Trail ---------- */
+  .trail-panel{ padding:24px 24px 20px; position:relative; overflow:hidden; }
+  .trail-panel::before{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(600px 200px at 50% 0%, rgba(167,139,250,0.05), transparent);
+    pointer-events:none;
+  }
+  .trail-context{ font-size:12.5px; color:var(--text-secondary); margin-bottom:18px; }
+  .trail-context .issue{ font-family:var(--font-mono); color:var(--signal-violet); }
+
+  .trail{ display:flex; align-items:stretch; gap:0; position:relative; }
+  .trail-node{
+    flex:1; min-width:0; padding:16px 16px 14px; border-radius:10px;
+    border:1px solid var(--ink-line); background:var(--ink-raised-2);
+    cursor:pointer; transition:border-color .15s, transform .15s;
+    position:relative;
+  }
+  .trail-node:hover{ border-color:var(--ink-line); transform:translateY(-1px); }
+  .trail-node.selected{ border-color:var(--signal-cyan); box-shadow:0 0 0 1px rgba(79,216,196,0.25), 0 0 24px rgba(79,216,196,0.08); }
+  .trail-node + .trail-node{ margin-left:14px; }
+
+  .trail-connector{
+    position:absolute; top:50%; height:1px; background:linear-gradient(90deg, var(--ink-line), var(--signal-cyan), var(--ink-line));
+    opacity:0.35; z-index:0;
+  }
+
+  .node-kind{
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:6px;
+  }
+  .node-kind .tag{
+    padding:1.5px 6px; border-radius:4px; font-size:9px;
+  }
+  .tag.deterministic{ background:var(--signal-cyan-dim); color:var(--signal-cyan); }
+  .tag.cognitive{ background:var(--signal-violet-dim); color:var(--signal-violet); }
+  .tag.synthesis{ background:var(--signal-amber-dim); color:var(--signal-amber); }
+
+  .node-title{ font-family:var(--font-display); font-size:14.5px; font-weight:600; margin-bottom:6px; }
+  .node-summary{ font-size:11.5px; color:var(--text-secondary); line-height:1.5; }
+  .node-metric{ font-family:var(--font-mono); font-size:18px; font-weight:600; color:var(--text-primary); margin-top:10px; }
+  .node-metric .unit{ font-size:11px; color:var(--text-dim); font-weight:400; margin-left:2px; }
+
+  .trail-detail{
+    margin-top:16px; border-radius:10px; border:1px solid var(--ink-line);
+    background:var(--ink); padding:18px 20px; display:none;
+  }
+  .trail-detail.open{ display:block; }
+  .detail-row{ display:flex; gap:14px; padding:9px 0; border-bottom:1px solid var(--ink-line-soft); font-size:12px; }
+  .detail-row:last-child{ border-bottom:none; }
+  .detail-key{ font-family:var(--font-mono); color:var(--text-dim); min-width:150px; flex-shrink:0; }
+  .detail-val{ color:var(--text-secondary); }
+  .detail-val.mono{ font-family:var(--font-mono); color:var(--text-primary); }
+  .bar-track{ width:100px; height:5px; background:var(--ink-line); border-radius:3px; overflow:hidden; flex-shrink:0; margin-top:3px; }
+  .bar-fill{ height:100%; background:var(--signal-cyan); border-radius:3px; }
+
+  .verdict-line{
+    margin-top:16px; padding:12px 16px; border-radius:8px;
+    border:1px solid rgba(79,216,196,0.25); background:rgba(79,216,196,0.05);
+    font-family:var(--font-mono); font-size:12px; color:var(--signal-cyan);
+    display:flex; align-items:center; gap:10px;
+  }
+
+  /* ---------- Grid: Security + NEIS health ---------- */
+  .grid-2{ display:grid; grid-template-columns:1.15fr 0.85fr; gap:18px; align-items:stretch; }
+
+  .gauge-row{ display:flex; align-items:center; gap:22px; margin-bottom:18px; }
+  .gauge-num{ font-family:var(--font-display); font-size:38px; font-weight:700; }
+  .gauge-label{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); letter-spacing:0.5px; text-transform:uppercase; margin-top:2px; }
+
+  .sev-bars{ display:flex; flex-direction:column; gap:8px; flex:1; }
+  .sev-row{ display:flex; align-items:center; gap:10px; }
+  .sev-name{ font-family:var(--font-mono); font-size:10.5px; width:64px; color:var(--text-dim); }
+  .sev-track{ flex:1; height:6px; background:var(--ink-line-soft); border-radius:3px; overflow:hidden; }
+  .sev-fill{ height:100%; border-radius:3px; }
+  .sev-fill.critical{ background:var(--signal-red); } .sev-fill.high{ background:#E88A5D; }
+  .sev-fill.medium{ background:var(--signal-amber); } .sev-fill.low{ background:var(--text-dim); }
+  .sev-count{ font-family:var(--font-mono); font-size:11px; width:16px; text-align:right; color:var(--text-secondary); }
+
+  .scanner-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; }
+  .scanner-chip{
+    font-family:var(--font-mono); font-size:10px; padding:4px 9px; border-radius:100px;
+    border:1px solid var(--ink-line); color:var(--text-dim); display:flex; align-items:center; gap:5px;
+  }
+  .scanner-chip.ran{ color:var(--signal-cyan); border-color:rgba(79,216,196,0.25); }
+  .scanner-chip .sdot{ width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+  .neis-metric{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--ink-line-soft); }
+  .neis-metric:last-child{ border-bottom:none; }
+  .neis-metric-name{ font-size:12px; color:var(--text-secondary); }
+  .neis-metric-val{ font-family:var(--font-mono); font-size:12.5px; color:var(--text-primary); }
+
+  /* ---------- Decision Registry timeline ---------- */
+  .timeline{ display:flex; flex-direction:column; }
+  .tl-item{
+    display:grid; grid-template-columns:96px 20px 1fr; gap:0;
+    padding:13px 0; border-bottom:1px solid var(--ink-line-soft);
+  }
+  .tl-item:last-child{ border-bottom:none; }
+  .tl-time{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); padding-top:2px; }
+  .tl-rail{ display:flex; flex-direction:column; align-items:center; }
+  .tl-dot{ width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .tl-dot.approve{ background:var(--signal-cyan); } .tl-dot.warn{ background:var(--signal-amber); } .tl-dot.block{ background:var(--signal-red); }
+  .tl-line{ width:1px; flex:1; background:var(--ink-line); margin-top:4px; }
+  .tl-content{ padding-left:14px; }
+  .tl-title{ font-size:12.5px; color:var(--text-primary); margin-bottom:3px; }
+  .tl-title .gate{ font-family:var(--font-mono); font-size:10px; color:var(--text-dim); margin-right:8px; }
+  .tl-justification{ font-size:11.5px; color:var(--text-secondary); line-height:1.5; }
+  .tl-meta{ font-family:var(--font-mono); font-size:10px; color:var(--text-dim); margin-top:5px; }
+
+  /* ---------- Documents ---------- */
+  .doc-list{ display:flex; flex-direction:column; gap:1px; }
+  .doc-row{
+    display:grid; grid-template-columns:24px 1fr auto auto; gap:12px; align-items:center;
+    padding:11px 4px; border-bottom:1px solid var(--ink-line-soft);
+  }
+  .doc-row:last-child{ border-bottom:none; }
+  .doc-icon{ width:22px; height:22px; border-radius:5px; background:var(--ink-line-soft); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:8.5px; color:var(--text-dim); }
+  .doc-name{ font-size:12.5px; }
+  .doc-sub{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+  .doc-status{ font-family:var(--font-mono); font-size:10px; padding:3px 8px; border-radius:100px; }
+  .doc-status.clean{ background:var(--signal-cyan-dim); color:var(--signal-cyan); }
+  .doc-status.unavailable{ background:var(--ink-line-soft); color:var(--text-dim); }
+  .doc-version{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); }
+
+  footer{
+    margin-top:40px; padding-top:18px; border-top:1px solid var(--ink-line);
+    font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);
+    display:flex; justify-content:space-between;
+  }
+
+  @media (max-width:900px){
+    .shell{ grid-template-columns:1fr; }
+    .sidebar{ display:none; }
+    .grid-2{ grid-template-columns:1fr; }
+    .trail{ flex-direction:column; }
+    .trail-node + .trail-node{ margin-left:0; margin-top:10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">N</div>
+      <div>
+        <div class="brand-text">Nakima</div>
+        <div class="brand-sub">Engineering Intelligence</div>
+      </div>
+    </div>
+
+    <div class="nav-group-label">Command Center</div>
+    <a class="nav-item active" href="#reasoning"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.2"/><path d="M10 6.5v3.8l2.6 1.6"/></svg>Overview</a>
+    <a class="nav-item" href="#reasoning"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10h3l2-5 4 10 2-5h3"/></svg>Reasoning Trail</a>
+    <a class="nav-item" href="#security"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2.5l6 2.3v4.6c0 4-2.5 6.6-6 8-3.5-1.4-6-4-6-8V4.8z"/></svg>Security</a>
+    <a class="nav-item" href="#decisions"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h12v12H4z"/><path d="M7 8h6M7 11h6M7 14h3"/></svg>Decisions</a>
+    <a class="nav-item" href="#documents"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2.5h5.5L15 6v11.5H6z"/><path d="M11.5 2.5V6H15"/></svg>Documents</a>
+
+    <div class="nav-group-label">Configuration</div>
+    <a class="nav-item"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2.6"/><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M5.3 14.7l1.4-1.4M13.3 6.7l1.4-1.4"/></svg>Project DNA</a>
+    <a class="nav-item"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h12M4 10h12M4 14h8"/></svg>Reports<span class="kbd">3</span></a>
+
+    <div class="sidebar-footer">
+      <div class="repo-card">
+        <div class="repo-avatar">GH</div>
+        <div style="min-width:0;">
+          <div class="repo-name">cirvannaco-png/PAMASMMA-</div>
+          <div class="repo-branch">main · v4</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Command Center</div>
+        <div class="topbar-meta"><span class="dot">●</span> Last scan 4 min ago · issue #212 · 3 files changed</div>
+      </div>
+      <div class="gate-strip">
+        <div class="gate-chip"><span class="gate-dot approve"></span><span class="label">Intent</span><span class="state approve">Approve</span></div>
+        <div class="gate-chip"><span class="gate-dot warn"></span><span class="label">Quality</span><span class="state warn">Warn</span></div>
+        <div class="gate-chip"><span class="gate-dot approve"></span><span class="label">Security</span><span class="state approve">Approve</span></div>
+        <div class="gate-chip"><span class="gate-dot approve"></span><span class="label">Verification</span><span class="state approve">Pass</span></div>
+      </div>
+    </div>
+
+    <!-- ============ SIGNATURE: REASONING TRAIL ============ -->
+    <section id="reasoning">
+      <div class="section-head">
+        <div>
+          <span class="section-eyebrow">Intent Drift Validator</span>
+          <div class="section-title">Reasoning Trail</div>
+          <div class="section-desc">Every automated decision passes through deterministic evidence, cognitive judgment, and arbitration before a verdict is reached — click a stage to see why.</div>
+        </div>
+      </div>
+
+      <div class="panel trail-panel">
+        <div class="trail-context">Validating plan for <span class="issue">#212 — Add Redis-backed rate limiting to /api/v1/tasks</span></div>
+
+        <div class="trail">
+          <div class="trail-node selected" data-node="evidence">
+            <div class="node-kind"><span class="tag deterministic">Deterministic</span>Evidence Engine</div>
+            <div class="node-title">Intent Confidence</div>
+            <div class="node-summary">Goals, constraints &amp; freshness scored against UserIntent</div>
+            <div class="node-metric">0.87<span class="unit">/ 1.0</span></div>
+          </div>
+          <div class="trail-node" data-node="cognitive">
+            <div class="node-kind"><span class="tag cognitive">LLM-assisted</span>Cognitive Engine</div>
+            <div class="node-title">Alignment Judgment</div>
+            <div class="node-summary">Does the plan fit the stated goals? Never authoritative alone.</div>
+            <div class="node-metric" style="color:var(--signal-violet)">Aligned</div>
+          </div>
+          <div class="trail-node" data-node="arbitration">
+            <div class="node-kind"><span class="tag synthesis">Reconciliation</span>Arbitration Engine</div>
+            <div class="node-title">Verdict</div>
+            <div class="node-summary">Reconciles evidence against judgment — evidence always wins.</div>
+            <div class="node-metric" style="color:var(--signal-cyan)">Approve</div>
+          </div>
+          <div class="trail-node" data-node="decision">
+            <div class="node-kind"><span class="tag synthesis">Recorded</span>Decision Registry</div>
+            <div class="node-title">Logged</div>
+            <div class="node-summary">Written to the audit trail before any code is generated.</div>
+            <div class="node-metric" style="font-size:14px;">#d4f1-92ab</div>
+          </div>
+        </div>
+
+        <!-- Detail panels -->
+        <div class="trail-detail open" id="detail-evidence">
+          <div class="detail-row"><div class="detail-key">goals</div><div class="detail-val">3 recorded · reduce API p99 latency, prep for public launch, cut infra cost</div></div>
+          <div class="detail-row"><div class="detail-key">constraints</div><div class="detail-val">2 recorded · no new paid dependencies, keep Python 3.11 compatibility</div></div>
+          <div class="detail-row"><div class="detail-key">hard violations</div><div class="detail-val mono">none found</div></div>
+          <div class="detail-row"><div class="detail-key">freshness</div><div class="detail-val">intent set 6 days ago<div class="bar-track"><div class="bar-fill" style="width:96%"></div></div></div></div>
+          <div class="detail-row"><div class="detail-key">score</div><div class="detail-val mono">0.87 — above the 0.40 confirmation threshold</div></div>
+        </div>
+        <div class="trail-detail" id="detail-cognitive">
+          <div class="detail-row"><div class="detail-key">alignment</div><div class="detail-val mono" style="color:var(--signal-violet)">aligned</div></div>
+          <div class="detail-row"><div class="detail-key">confidence</div><div class="detail-val">0.81 <div class="bar-track"><div class="bar-fill" style="width:81%; background:var(--signal-violet)"></div></div></div></div>
+          <div class="detail-row"><div class="detail-key">source</div><div class="detail-val mono">llm</div></div>
+          <div class="detail-row"><div class="detail-key">explanation</div><div class="detail-val">Rate limiting directly serves the "reduce p99 latency" and "prep for public launch" goals; Redis is a common, well-understood choice for this.</div></div>
+        </div>
+        <div class="trail-detail" id="detail-arbitration">
+          <div class="detail-row"><div class="detail-key">hard violations</div><div class="detail-val mono">none</div></div>
+          <div class="detail-row"><div class="detail-key">intent confidence</div><div class="detail-val mono">0.87 — not low-confidence</div></div>
+          <div class="detail-row"><div class="detail-key">cognitive input</div><div class="detail-val mono">aligned @ 0.81</div></div>
+          <div class="detail-row"><div class="detail-key">reasoning</div><div class="detail-val">No hard constraint violations found; intent confidence 0.87. Cognitive assessment (llm): aligned (confidence 0.81) — approved without downgrade.</div></div>
+        </div>
+        <div class="trail-detail" id="detail-decision">
+          <div class="detail-row"><div class="detail-key">context</div><div class="detail-val">Intent drift validation for issue #212</div></div>
+          <div class="detail-row"><div class="detail-key">related files</div><div class="detail-val mono">api/v1/endpoints/tasks.py, execution/rate_limit.py</div></div>
+          <div class="detail-row"><div class="detail-key">author</div><div class="detail-val mono">nakima</div></div>
+          <div class="detail-row"><div class="detail-key">recorded</div><div class="detail-val mono">2026-07-20T09:14:02Z</div></div>
+        </div>
+
+        <div class="verdict-line">✓ Approved — implementation may proceed. Logged to Decision Registry #d4f1-92ab.</div>
+      </div>
+    </section>
+
+    <!-- ============ SECURITY + NEIS HEALTH ============ -->
+    <section id="security">
+      <div class="section-head">
+        <div>
+          <span class="section-eyebrow">NSIL</span>
+          <div class="section-title">Security &amp; Repository Health</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="gauge-row">
+            <div>
+              <div class="gauge-num" style="color:var(--signal-cyan)">92</div>
+              <div class="gauge-label">Security Score / 100</div>
+            </div>
+            <div class="sev-bars">
+              <div class="sev-row"><span class="sev-name">Critical</span><div class="sev-track"><div class="sev-fill critical" style="width:0%"></div></div><span class="sev-count">0</span></div>
+              <div class="sev-row"><span class="sev-name">High</span><div class="sev-track"><div class="sev-fill high" style="width:8%"></div></div><span class="sev-count">1</span></div>
+              <div class="sev-row"><span class="sev-name">Medium</span><div class="sev-track"><div class="sev-fill medium" style="width:20%"></div></div><span class="sev-count">2</span></div>
+              <div class="sev-row"><span class="sev-name">Low</span><div class="sev-track"><div class="sev-fill low" style="width:30%"></div></div><span class="sev-count">3</span></div>
+            </div>
+          </div>
+          <div class="scanner-chips">
+            <div class="scanner-chip ran"><span class="sdot"></span>secret_detection</div>
+            <div class="scanner-chip ran"><span class="sdot"></span>config_security</div>
+            <div class="scanner-chip ran"><span class="sdot"></span>sast</div>
+            <div class="scanner-chip ran"><span class="sdot"></span>dependency_audit</div>
+            <div class="scanner-chip"><span class="sdot"></span>dast — not requested</div>
+            <div class="scanner-chip"><span class="sdot"></span>virus — clamd unconfigured</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="neis-metric"><span class="neis-metric-name">Health score</span><span class="neis-metric-val" style="color:var(--signal-cyan)">84.2 / 100</span></div>
+          <div class="neis-metric"><span class="neis-metric-name">Test-to-code ratio</span><span class="neis-metric-val">0.41</span></div>
+          <div class="neis-metric"><span class="neis-metric-name">Docstring coverage</span><span class="neis-metric-val">0.63</span></div>
+          <div class="neis-metric"><span class="neis-metric-name">Files / tests</span><span class="neis-metric-val">142 / 58</span></div>
+          <div class="neis-metric"><span class="neis-metric-name">Snapshot taken</span><span class="neis-metric-val">2026-07-20 09:02 UTC</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DECISION REGISTRY ============ -->
+    <section id="decisions">
+      <div class="section-head">
+        <div>
+          <span class="section-eyebrow">Institutional memory</span>
+          <div class="section-title">Decision Registry</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-time">09:14:11</div>
+            <div class="tl-rail"><div class="tl-dot approve"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-title"><span class="gate">VERIFICATION</span>PR opened: #213</div>
+              <div class="tl-justification">Intent: approve; Security: approved (score 92/100, 0 critical); Quality: warn (no test files touched)</div>
+              <div class="tl-meta">#212 · api/v1/endpoints/tasks.py, execution/rate_limit.py</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-time">09:14:06</div>
+            <div class="tl-rail"><div class="tl-dot warn"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-title"><span class="gate">QUALITY</span>warn</div>
+              <div class="tl-justification">2 source file(s) changed with no test file touched. Doesn't block — worth a human's attention before merge.</div>
+              <div class="tl-meta">#212</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-time">09:14:04</div>
+            <div class="tl-rail"><div class="tl-dot approve"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-title"><span class="gate">SECURITY</span>Approved</div>
+              <div class="tl-justification">Security score 92/100; 0 critical, 1 high open finding(s); 0 new, 1 resolved this scan.</div>
+              <div class="tl-meta">#212</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-time">09:14:02</div>
+            <div class="tl-rail"><div class="tl-dot approve"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-title"><span class="gate">INTENT</span>Verdict: approve</div>
+              <div class="tl-justification">No hard constraint violations found; intent confidence 0.87. Cognitive assessment (llm): aligned (confidence 0.81).</div>
+              <div class="tl-meta">#212</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-time">Yesterday</div>
+            <div class="tl-rail"><div class="tl-dot block"></div></div>
+            <div class="tl-content">
+              <div class="tl-title"><span class="gate">SECURITY</span>Blocked</div>
+              <div class="tl-justification">1 critical finding — hardcoded AWS access key detected in config/settings.py:14.</div>
+              <div class="tl-meta">#209</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DOCUMENTS ============ -->
+    <section id="documents">
+      <div class="section-head">
+        <div>
+          <span class="section-eyebrow">Upload Gateway</span>
+          <div class="section-title">Project Documents</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="doc-list">
+          <div class="doc-row">
+            <div class="doc-icon">PDF</div>
+            <div><div class="doc-name">product-vision-v3.pdf</div><div class="doc-sub">sha256:8f2a41… · 412 KB</div></div>
+            <div class="doc-status clean">virus: clean</div>
+            <div class="doc-version">v4</div>
+          </div>
+          <div class="doc-row">
+            <div class="doc-icon">MD</div>
+            <div><div class="doc-name">architecture-decisions.md</div><div class="doc-sub">sha256:1c9e0b… · 18 KB</div></div>
+            <div class="doc-status clean">virus: clean</div>
+            <div class="doc-version">v2</div>
+          </div>
+          <div class="doc-row">
+            <div class="doc-icon">YML</div>
+            <div><div class="doc-name">openapi-spec.yaml</div><div class="doc-sub">sha256:44d7aa… · 6 KB</div></div>
+            <div class="doc-status unavailable">virus: unavailable</div>
+            <div class="doc-version">v1</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Nakima Engineering Intelligence Platform</span>
+      <span>Decision Registry · Event Log · NSIL · every action carries a reasoning trail</span>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  const nodes = document.querySelectorAll('.trail-node');
+  const details = document.querySelectorAll('.trail-detail');
+
+  nodes.forEach(node => {
+    node.addEventListener('click', () => {
+      nodes.forEach(n => n.classList.remove('selected'));
+      details.forEach(d => d.classList.remove('open'));
+      node.classList.add('selected');
+      document.getElementById('detail-' + node.dataset.node).classList.add('open');
+    });
+  });
+
+  // Smooth active-state on sidebar nav for in-page sections
+  document.querySelectorAll('.nav-item[href^="#"]').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

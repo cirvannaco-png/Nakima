@@ -31,6 +31,26 @@ services:
     # just makes `docker-compose build` produce it as part of one command.
     entrypoint: ["true"]
 
+  clamav:
+    image: clamav/clamav:stable
+    # ClamAV starts freshclam (signature downloader) and clamd (scanner
+    # daemon) in the same container. First startup is slow (~1 min) while
+    # the initial virus database is downloaded. Subsequent starts reuse
+    # the volume cache and are fast.
+    # Set CLAMD_HOST=clamav in your .env (or the app service environment
+    # below) to activate VirusScanner; omitting it leaves the scanner in
+    # "unavailable" / fail-open mode per security/virus_scanner.py design.
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s  # freshclam download on first run
+
   app:
     build: .
     command: uvicorn api.router:app --host 0.0.0.0 --port 8000 --reload
@@ -40,6 +60,8 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://nakima:nakima@db:5432/nakima
       - REDIS_URL=redis://redis:6379/0
+      - CLAMD_HOST=clamav
+      - CLAMD_PORT=3310
     volumes:
       - ./:/app
       - /var/run/docker.sock:/var/run/docker.sock  # app needs to spawn sandbox containers
@@ -50,6 +72,9 @@ services:
         condition: service_started
       sandbox:
         condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  clamav_db:

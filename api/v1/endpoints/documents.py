@@ -42,6 +42,7 @@ def _to_response(doc: ProjectDocument, is_duplicate: bool = False) -> DocumentRe
         rejection_reason=doc.rejection_reason,
         extracted_text_preview=preview,
         is_duplicate=is_duplicate,
+        virus_scan_status=doc.virus_scan_status,
         uploaded_at=doc.uploaded_at.isoformat(),
     )
 

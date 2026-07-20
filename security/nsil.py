@@ -14,6 +14,7 @@ rather than DAST's observational checks. See security/dast.py's docstring
 for the reasoning; it isn't a difficulty gap, it's a scoping decision.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -29,6 +30,7 @@ from security.config_scanner import ConfigSecurityScanner
 from security.dast import DASTScanner
 from security.risk_scoring import RiskScorer
 from security.secret_scanner import SecretScanner
+from security.virus_scanner import VirusScanner, VirusScannerUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,24 @@ class SecurityIntelligenceLayer:
                 "detail": config_finding.detail,
             }
         scanners_run.append("config_security")
+
+        try:
+            scanner = VirusScanner()
+            virus_findings = await asyncio.to_thread(scanner.scan_directory, repo_dir)
+            for virus_finding in virus_findings:
+                fp = fingerprint("virus", virus_finding.threat_name, virus_finding.file_path, None)
+                current[fp] = {
+                    "source": "virus",
+                    "rule": virus_finding.threat_name,
+                    "severity": "critical",  # a real malware match is always critical, not a judgment call
+                    "file_path": virus_finding.file_path,
+                    "line_number": None,
+                    "detail": virus_finding.detail,
+                }
+            scanners_run.append("virus")
+        except VirusScannerUnavailable as e:
+            logger.warning(f"NSIL: virus scan skipped, clamd unavailable: {e}")
+            scanners_skipped.append("virus")
 
         if target_url:
             try:

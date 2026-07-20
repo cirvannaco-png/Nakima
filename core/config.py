@@ -77,6 +77,18 @@ class Settings(BaseSettings):
     # already discussed for Cirvanna's Hugging Face Spaces vs. GCE decision.
     REPORTS_DIR: str = "./reports_output"
 
+    # Virus scanning (security/virus_scanner.py) via a ClamAV clamd daemon.
+    # None (the default) means no scanner is reachable — uploads and repo
+    # scans proceed without a virus check, and that fact is recorded
+    # honestly (ProjectDocument.virus_scan_status = "unavailable",
+    # SecurityIntelligenceLayer reports "virus" in scanners_skipped)
+    # rather than silently treated as "scanned and clean". Set CLAMD_HOST
+    # to enable it — see security/virus_scanner.py's docstring for the
+    # deployment steps (clamd + freshclam) this actually requires.
+    CLAMD_HOST: str | None = None
+    CLAMD_PORT: int = 3310
+    CLAMD_TIMEOUT_SECONDS: float = 15.0
+
     # Logging: "json" (default, structured) or "text" (human-readable dev logs).
     LOG_FORMAT: str = "json"
 

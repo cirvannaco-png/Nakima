@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -10,6 +12,8 @@ from core.config import PreflightError, preflight, settings
 from core.limiter import limiter
 from core.logging import setup_logging
 from githubapp.app import router as github_router
+
+_STATIC_DIR = Path(__file__).parent.parent / "static"
 
 OPENAPI_DESCRIPTION = """
 **Nakima** is a multi-agent orchestration platform that plans, executes, and
@@ -69,6 +73,11 @@ def create_app() -> FastAPI:
     app.include_router(v1_router, prefix="/api/v1")
     # GitHub App webhook receiver — HMAC verified inside the handler.
     app.include_router(github_router, prefix="/github", tags=["github"])
+
+    # Static assets — the Command Centre dashboard and any future UI files.
+    # Mounted last so the API routes above always take precedence.
+    if _STATIC_DIR.is_dir():
+        app.mount("/static", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
 
     @app.get("/", tags=["health"], summary="Service banner")
     def root() -> dict:

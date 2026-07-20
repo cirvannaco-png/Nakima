@@ -128,6 +128,7 @@ class DocumentResponse(BaseModel):
     rejection_reason: str | None
     extracted_text_preview: str | None
     is_duplicate: bool = False
+    virus_scan_status: str = "unavailable"
     uploaded_at: str
 
 

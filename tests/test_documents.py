@@ -7,7 +7,6 @@ against the actual library round-trip.
 import io
 
 import docx
-import pytest
 from pypdf import PdfWriter
 
 from documents import validators as validators_mod
@@ -207,6 +206,47 @@ async def test_gateway_rejected_upload_still_consumes_a_version(db_session):
 
     assert rejected.document.version == 1
     assert accepted.document.version == 2
+
+
+async def test_gateway_rejects_infected_file(db_session, monkeypatch):
+    from documents import gateway as gateway_mod
+    from security.virus_scanner import VirusScanResult
+
+    monkeypatch.setattr(
+        gateway_mod.VirusScanner,
+        "scan",
+        lambda self, content: VirusScanResult(status="infected", threat_name="Eicar-Test-Signature"),
+    )
+    repo = await _make_repo(db_session)
+    result = await ProjectUploadGateway(db_session, repo.id).upload("notes.txt", b"pretend-eicar-content")
+
+    assert result.document.status == "rejected"
+    assert result.document.virus_scan_status == "infected"
+    assert "Eicar-Test-Signature" in result.document.rejection_reason
+    assert result.document.extracted_text is None
+
+
+async def test_gateway_records_clean_scan_status_on_success(db_session, monkeypatch):
+    from documents import gateway as gateway_mod
+    from security.virus_scanner import VirusScanResult
+
+    monkeypatch.setattr(gateway_mod.VirusScanner, "scan", lambda self, content: VirusScanResult(status="clean"))
+    repo = await _make_repo(db_session)
+    result = await ProjectUploadGateway(db_session, repo.id).upload("notes.txt", b"hello")
+
+    assert result.document.status == "processed"
+    assert result.document.virus_scan_status == "clean"
+
+
+async def test_gateway_records_unavailable_scan_status_when_clamd_not_configured(db_session):
+    # No monkeypatching — VirusScanner() with no CLAMD_HOST configured
+    # (the test-suite default) returns "unavailable" for real, exercising
+    # the actual fail-open code path rather than a simulated one.
+    repo = await _make_repo(db_session)
+    result = await ProjectUploadGateway(db_session, repo.id).upload("notes.txt", b"hello")
+
+    assert result.document.status == "processed"
+    assert result.document.virus_scan_status == "unavailable"
 
 
 async def test_gateway_versions_independent_per_repository(db_session):

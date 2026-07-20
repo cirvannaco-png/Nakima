@@ -39,6 +39,12 @@ class ProjectDocument(Base):
 
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # "clean" | "infected" | "unavailable" | "error" — see
+    # security/virus_scanner.py. "unavailable" (no clamd configured) is
+    # recorded explicitly rather than left null, so "never scanned" can
+    # never be misread as "scanned and clean" by anyone querying this table.
+    virus_scan_status: Mapped[str] = mapped_column(String(20), default="unavailable")
+
     # "processed" | "rejected" — a rejected upload (failed validation)
     # still gets a row, so "someone tried to upload X and it was
     # rejected because Y" is itself part of the audit trail.
