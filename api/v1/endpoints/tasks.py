@@ -73,7 +73,7 @@ async def _get_or_create_repo(db: AsyncSession, repo_full_name: str) -> Reposito
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=dict)
+@router.post("/", response_model=TaskResponse)
 async def create_task(
     req: TaskCreateRequest,
     db: AsyncSession = Depends(get_db),  # noqa: B008
@@ -101,9 +101,9 @@ async def create_task(
     # Hand off to the orchestrator workflow asynchronously.
     # Import here to avoid circular import at module level.
     try:
-        from orchestrator.workflow import run_task  # type: ignore[import]
         import asyncio
-        asyncio.ensure_future(
+        from orchestrator.workflow import run_task
+        asyncio.create_task(
             run_task(
                 task_id=task.id,
                 repo_full_name=req.repo_full_name,
@@ -119,7 +119,7 @@ async def create_task(
     return _task_to_response(task, req.repo_full_name)
 
 
-@router.get("/", response_model=list[dict])
+@router.get("/", response_model=list[TaskResponse])
 async def list_tasks(
     limit: int = 50,
     status: str | None = None,
@@ -144,7 +144,7 @@ async def list_tasks(
     return [_task_to_response(task, full_name) for task, full_name in rows]
 
 
-@router.get("/{task_id}", response_model=dict)
+@router.get("/{task_id}", response_model=TaskResponse)
 async def get_task(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),  # noqa: B008

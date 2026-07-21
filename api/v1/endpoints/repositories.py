@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,8 +70,8 @@ async def index_repository(
 @router.get("/{repo_full_name:path}/health", response_model=HealthScoreResponse)
 async def get_repository_health(
     repo_full_name: str,
-    github_token: str,
     db: AsyncSession = Depends(get_db),  # noqa: B008
+    github_token: str = Header(..., alias="X-GitHub-Token"),
 ):
     result = await db.execute(select(Repository).where(Repository.full_name == repo_full_name))
     repo = result.scalar_one_or_none()

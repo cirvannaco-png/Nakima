@@ -143,6 +143,16 @@ def preflight(s: "Settings | None" = None) -> list[str]:
         if not s.DEEPSEEK_API_KEY:
             errors.append("DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing.")
 
+    # If a key path is given, verify the file actually exists before treating
+    # it as "provided" — a missing file fails at JWT-signing time, not here.
+    if s.GITHUB_PRIVATE_KEY_PATH:
+        import os  # noqa: PLC0415
+        if not os.path.isfile(s.GITHUB_PRIVATE_KEY_PATH):
+            errors.append(
+                f"GITHUB_PRIVATE_KEY_PATH={s.GITHUB_PRIVATE_KEY_PATH!r} does not exist "
+                "or is not a regular file."
+            )
+
     # GitHub App: optional overall, but if partly set, all three must be present.
     app_bits = [s.GITHUB_APP_ID, (s.GITHUB_PRIVATE_KEY or s.GITHUB_PRIVATE_KEY_PATH), s.GITHUB_WEBHOOK_SECRET]
     if any(app_bits) and not all(app_bits):

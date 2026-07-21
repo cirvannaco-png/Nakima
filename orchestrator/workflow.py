@@ -32,6 +32,51 @@ logger = logging.getLogger(__name__)
 MAX_VALIDATION_RETRIES = 3
 
 
+async def run_task(
+    task_id: uuid.UUID,
+    repo_full_name: str,
+    issue_number: int,
+    github_token: str | None,
+) -> None:
+    """Module-level entry point for dashboard-triggered tasks.
+
+    Builds a minimal issue payload so that _run_pipeline can operate
+    on the same code path as webhook-triggered tasks.  The issue title
+    and body are fetched from GitHub when a token is available; otherwise
+    a safe synthetic payload is used so the task can still attempt to run.
+    """
+    issue_payload: dict = {
+        "issue": {
+            "number": issue_number,
+            "title": f"Issue #{issue_number}",
+            "body": None,
+        }
+    }
+
+    if github_token:
+        try:
+            from github import Github  # noqa: PLC0415  (local import avoids top-level circular dep)
+
+            gh_issue = Github(github_token).get_repo(repo_full_name).get_issue(issue_number)
+            issue_payload = {
+                "issue": {
+                    "number": gh_issue.number,
+                    "title": gh_issue.title,
+                    "body": gh_issue.body,
+                }
+            }
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("run_task: could not fetch issue %s#%s from GitHub: %s", repo_full_name, issue_number, exc)
+
+    orchestrator = WorkflowOrchestrator()
+    await orchestrator.process_task(
+        task_id=str(task_id),
+        repo_full_name=repo_full_name,
+        issue_payload=issue_payload,
+        github_token=github_token or "",
+    )
+
+
 def security_gate_should_block(nsil_result) -> bool:
     """The Security Gate's actual decision rule, pulled out of
     _run_pipeline so it's testable without mocking the entire pipeline
@@ -378,7 +423,7 @@ class WorkflowOrchestrator:
         )
 
         async with AsyncSessionLocal() as session:
-            task = await session.get(Task, task_id)
+            task = await session.get(Task, uuid.UUID(task_id))
             task.status = TaskStatus.SUCCESS
             task.pr_url = pr.html_url
             await session.commit()
