@@ -20,9 +20,9 @@ RUN groupadd --gid 1001 nakima && \
 
 WORKDIR /app
 
-# Runtime deps only (libpq for asyncpg)
+# Runtime deps only (libpq for asyncpg, git for gitpython clone_from)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl \
+    libpq5 curl git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-built packages from builder
@@ -48,5 +48,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 CMD ["uvicorn", "api.router:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
-     "--workers", "4", \
+     "--workers", "1", \
      "--log-level", "info"]
