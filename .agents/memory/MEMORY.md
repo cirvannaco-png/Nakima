@@ -1,0 +1,2 @@
+- [Nakima repo push & vulnerability remediation](nakima-security-push.md) — Python deps fixed; Node.js transitive CVEs are Replit template infra, not Nakima app
+- [Nakima UI architecture](nakima-ui.md) — command-center.html is a single-file SPA wired to all API endpoints; no build step needed
