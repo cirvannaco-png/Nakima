@@ -4,7 +4,7 @@ neis/analyzers/innovation_engine.py's InnovationReasoningEngine.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from models.neis.user_intent import UserIntent
 
@@ -75,7 +75,7 @@ class EvidenceEngine:
         if note_len == 0:
             missing.append("notes")
 
-        age_days = (datetime.utcnow() - intent.created_at).days
+        age_days = (datetime.now(timezone.utc).replace(tzinfo=None) - intent.created_at).days
         if age_days <= _FRESHNESS_GRACE_DAYS:
             components["freshness"] = _FRESHNESS_WEIGHT
         else:

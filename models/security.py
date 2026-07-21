@@ -1,6 +1,6 @@
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -50,6 +50,6 @@ class SecurityFinding(Base):
     # "open" | "resolved"
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
 
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

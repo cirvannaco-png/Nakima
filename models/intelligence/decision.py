@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -41,7 +41,7 @@ class EngineeringDecision(Base):
     # not per-human accounts).
     author: Mapped[str] = mapped_column(String(200), default="nakima")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
 
     extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -63,7 +63,7 @@ class EngineeringEvent(Base):
         ForeignKey("engineering_decisions.id"), nullable=True, index=True
     )
 
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
     author: Mapped[str] = mapped_column(String(200), default="nakima")
     task_description: Mapped[str] = mapped_column(Text)
 

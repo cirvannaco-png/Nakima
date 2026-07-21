@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -90,7 +90,7 @@ async def create_task(
             "issue_number": req.issue_number,
             "repo_full_name": req.repo_full_name,
             "github_token": bool(req.github_token),  # store presence only — never store tokens
-            "triggered_at": datetime.utcnow().isoformat(),
+            "triggered_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "source": "dashboard",
         },
     )

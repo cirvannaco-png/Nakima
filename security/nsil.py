@@ -19,7 +19,7 @@ target_url is set at all, covering both.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -259,7 +259,7 @@ class SecurityIntelligenceLayer:
         stmt = select(SecurityFinding).where(SecurityFinding.repository_id == self.repository_id)
         existing = {f.fingerprint: f for f in (await self.session.execute(stmt)).scalars().all()}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         new_count = 0
 
         for fp, data in current.items():

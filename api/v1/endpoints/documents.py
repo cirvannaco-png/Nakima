@@ -55,8 +55,14 @@ async def upload_document(
     file: UploadFile = File(...),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
+    _MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB hard cap — reading beyond this OOMs the process
     repo = await _get_repository_or_404(db, repo_full_name)
     content = await file.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content) // (1024 * 1024)} MB). Maximum allowed size is 50 MB.",
+        )
     result = await ProjectUploadGateway(db, repo.id).upload(file.filename or "unnamed", content)
     response = _to_response(result.document, is_duplicate=result.is_duplicate)
     if result.document.status == "rejected":

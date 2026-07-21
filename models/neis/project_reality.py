@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,7 +35,7 @@ class ProjectRealityModel(Base):
     health_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     health_components: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
 
     # Extension point for anything a specific analyzer run wants to attach
     # without a migration (e.g. framework detection heuristics). Not a

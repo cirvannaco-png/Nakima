@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -51,7 +51,7 @@ class ProjectDocument(Base):
     status: Mapped[str] = mapped_column(String(20), default="processed")
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
 
     # Raw bytes are NOT populated by default (extracted_text is what
     # downstream consumers need); see documents/gateway.py's docstring
