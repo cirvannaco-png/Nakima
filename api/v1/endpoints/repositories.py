@@ -15,6 +15,32 @@ from repository.health import HealthScorer
 router = APIRouter()
 
 
+@router.get("/", response_model=list[dict])
+async def list_repositories(
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """List all indexed repositories."""
+    result = await db.execute(select(Repository).order_by(Repository.created_at.desc()))
+    repos = result.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "full_name": r.full_name,
+            "github_repo_id": r.github_repo_id,
+            # Health / quality fields are computed on-demand via /health —
+            # listed here as None until a health check has been run.
+            "health_score": None,
+            "language": None,
+            "stars": None,
+            "complexity_score": None,
+            "coverage_score": None,
+            "dependency_score": None,
+            "indexed_at": r.created_at.isoformat(),
+        }
+        for r in repos
+    ]
+
+
 @router.post("/index", response_model=RepositoryIndexResponse)
 @limiter.limit("10/minute")
 async def index_repository(
