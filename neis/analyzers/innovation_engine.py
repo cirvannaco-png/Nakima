@@ -65,24 +65,27 @@ class InnovationReasoningEngine:
     def _pattern_recommendations(self, patterns: list[dict], weights: dict) -> list[dict]:
         recs = []
         for p in patterns:
-            if p["pattern_type"] == "god_class":
+            pattern_type = p.get("pattern_type", "")
+            if pattern_type == "god_class":
+                method_count = p.get("method_count", 0) or 0
                 recs.append(
                     {
                         "category": RecommendationCategory.ARCHITECTURE,
-                        "title": f"Split {p['subject']}",
-                        "rationale": p["summary"],
-                        "priority_score": min(p["method_count"] / 5.0, 10.0)
+                        "title": f"Split {p.get('subject', 'class')}",
+                        "rationale": p.get("summary", ""),
+                        "priority_score": min(method_count / 5.0, 10.0)
                         * weights.get("architecture", DEFAULT_WEIGHT),
                         "effort_estimate": EffortEstimate.LARGE,
                     }
                 )
-            elif p["pattern_type"] == "high_coupling_file":
+            elif pattern_type == "high_coupling_file":
+                fan_in = p.get("fan_in", 0) or 0
                 recs.append(
                     {
                         "category": RecommendationCategory.ARCHITECTURE,
-                        "title": f"Reduce coupling on {p['subject']}",
-                        "rationale": p["summary"],
-                        "priority_score": min(p["fan_in"] / 2.0, 10.0) * weights.get("architecture", DEFAULT_WEIGHT),
+                        "title": f"Reduce coupling on {p.get('subject', 'file')}",
+                        "rationale": p.get("summary", ""),
+                        "priority_score": min(fan_in / 2.0, 10.0) * weights.get("architecture", DEFAULT_WEIGHT),
                         "effort_estimate": EffortEstimate.MEDIUM,
                     }
                 )

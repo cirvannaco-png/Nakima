@@ -91,29 +91,37 @@ class SecurityIntelligenceLayer:
 
         current: dict[str, dict] = {}  # fingerprint -> finding dict
 
-        for secret_finding in SecretScanner().scan(repo_dir):
-            fp = fingerprint("secret", secret_finding.pattern_name, secret_finding.file_path, secret_finding.line_number)
-            current[fp] = {
-                "source": "secret",
-                "rule": secret_finding.pattern_name,
-                "severity": secret_finding.severity,
-                "file_path": secret_finding.file_path,
-                "line_number": secret_finding.line_number,
-                "detail": f"Possible secret ({secret_finding.pattern_name}): {secret_finding.redacted_preview}",
-            }
-        scanners_run.append("secret_detection")
+        try:
+            for secret_finding in SecretScanner().scan(repo_dir):
+                fp = fingerprint("secret", secret_finding.pattern_name, secret_finding.file_path, secret_finding.line_number)
+                current[fp] = {
+                    "source": "secret",
+                    "rule": secret_finding.pattern_name,
+                    "severity": secret_finding.severity,
+                    "file_path": secret_finding.file_path,
+                    "line_number": secret_finding.line_number,
+                    "detail": f"Possible secret ({secret_finding.pattern_name}): {secret_finding.redacted_preview}",
+                }
+            scanners_run.append("secret_detection")
+        except Exception as e:
+            logger.warning(f"NSIL: secret scan failed, skipping: {e}")
+            scanners_skipped.append("secret_detection")
 
-        for config_finding in ConfigSecurityScanner().scan(repo_dir):
-            fp = fingerprint("config", config_finding.rule, config_finding.file_path, None)
-            current[fp] = {
-                "source": "config",
-                "rule": config_finding.rule,
-                "severity": config_finding.severity,
-                "file_path": config_finding.file_path,
-                "line_number": None,
-                "detail": config_finding.detail,
-            }
-        scanners_run.append("config_security")
+        try:
+            for config_finding in ConfigSecurityScanner().scan(repo_dir):
+                fp = fingerprint("config", config_finding.rule, config_finding.file_path, None)
+                current[fp] = {
+                    "source": "config",
+                    "rule": config_finding.rule,
+                    "severity": config_finding.severity,
+                    "file_path": config_finding.file_path,
+                    "line_number": None,
+                    "detail": config_finding.detail,
+                }
+            scanners_run.append("config_security")
+        except Exception as e:
+            logger.warning(f"NSIL: config security scan failed, skipping: {e}")
+            scanners_skipped.append("config_security")
 
         try:
             for virus_finding in VirusScanner().scan_directory(repo_dir):

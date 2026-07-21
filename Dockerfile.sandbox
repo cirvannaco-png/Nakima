@@ -23,13 +23,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && npm install -g prettier eslint typescript \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Go toolchain
+# Go toolchain — install Go, set GOPATH to a system-owned dir so all
+# subsequently installed tools land in /usr/local/go-tools/bin, which is
+# added to PATH before the user switch so the non-root sandbox user can
+# reach them.
+ENV GOROOT="/usr/local/go"
+ENV GOPATH="/usr/local/go-tools"
+ENV PATH="/usr/local/go/bin:/usr/local/go-tools/bin:${PATH}"
+
 RUN curl -fsSL https://go.dev/dl/go1.22.5.linux-amd64.tar.gz -o /tmp/go.tar.gz \
-    && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz \
-    && /usr/local/go/bin/go install golang.org/x/lint/golint@latest 2>/dev/null || true
-ENV PATH="/usr/local/go/bin:${PATH}"
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest || true
-RUN go install github.com/securego/gosec/v2/cmd/gosec@latest || true
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz \
+    && mkdir -p /usr/local/go-tools \
+    && go install golang.org/x/lint/golint@latest 2>/dev/null || true \
+    && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest || true \
+    && go install github.com/securego/gosec/v2/cmd/gosec@latest || true \
+    && chmod -R 755 /usr/local/go-tools
 
 # Security: run as non-root inside sandbox too
 RUN groupadd --gid 1001 sandbox && \

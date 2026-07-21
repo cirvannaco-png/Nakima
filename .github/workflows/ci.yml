@@ -39,7 +39,7 @@ jobs:
       - name: Install bandit
         run: pip install bandit==1.8.5
       - name: Run bandit
-        run: bandit -r . -x alembic/versions,tests -ll -f txt || true
+        run: bandit -r . -x alembic/versions,tests -ll -f txt
 
   # ─── Dependency audit ───────────────────────────────────────────────────────
   audit:
@@ -54,7 +54,7 @@ jobs:
       - name: Install safety
         run: pip install safety==3.5.1
       - name: Audit dependencies
-        run: safety check -r requirements.txt || true
+        run: safety check -r requirements.txt
 
   # ─── Tests ──────────────────────────────────────────────────────────────────
   test:
@@ -94,7 +94,7 @@ jobs:
       - name: Run migrations
         run: alembic upgrade head
       - name: Test (with coverage)
-        run: pytest --tb=short -q --cov=. --cov-report=term-missing --cov-fail-under=60
+        run: pytest --tb=short -q --cov=. --cov-report=term-missing --cov-fail-under=80
 
   # ─── Docker build ───────────────────────────────────────────────────────────
   docker:
@@ -136,7 +136,7 @@ jobs:
         with:
           image-ref: "nakima:trivy"
           format: "table"
-          exit-code: "0"
+          exit-code: "1"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
