@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
         contact={"name": "Nakima", "url": "https://github.com/cirvannaco-png/Nakima"},
-        license_info={"name": "CC0-1.0"},
+        license_info={"name": "Proprietary — source available, no redistribution"},
     )
 
     app.add_middleware(

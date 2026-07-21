@@ -1254,7 +1254,7 @@ async function loadFindings() {
     }
     tbody.innerHTML = findings.map(f => `<tr>
       <td><span class="sev-badge ${f.severity}">${f.severity}</span></td>
-      <td><div class="finding-rule">${f.rule_id||'—'}</div></td>
+      <td><div class="finding-rule">${f.rule||'—'}</div></td>
       <td><div class="finding-detail">${f.detail||'—'}</div></td>
       <td><div class="finding-file">${f.file_path||'—'}${f.line_number?':'+f.line_number:''}</div></td>
       <td><span class="badge ${f.status==='open'?'failed':'success'}">${f.status||'open'}</span></td>
@@ -1378,8 +1378,8 @@ async function generateReport() {
     if (!repos.length) { toast('No repositories indexed yet.', 'error'); return; }
     const repo = repos[0].full_name;
     toast(`Generating PDF report for ${repo}…`);
-    await api(`/api/v1/intelligence/${encodeURIComponent(repo)}/report`, { method:'POST' });
-    window.open(`/api/v1/intelligence/${encodeURIComponent(repo)}/report/latest`, '_blank');
+    const report = await api(`/api/v1/intelligence/${encodeURIComponent(repo)}/reports/generate`, { method:'POST' });
+    window.open(`/api/v1/intelligence/${encodeURIComponent(repo)}/reports/${report.id}/download`, '_blank');
     toast('Report generated and downloaded');
   } catch(e) { toast(`Report error: ${e.message}`, 'error'); }
 }

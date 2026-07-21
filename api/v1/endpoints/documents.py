@@ -37,11 +37,14 @@ def _to_response(doc: ProjectDocument, is_duplicate: bool = False) -> DocumentRe
         filename=doc.filename,
         file_type=doc.file_type,
         size_bytes=doc.size_bytes,
+        size_kb=round(doc.size_bytes / 1024, 1),
         version=doc.version,
         status=doc.status,
         rejection_reason=doc.rejection_reason,
         extracted_text_preview=preview,
         is_duplicate=is_duplicate,
+        sha256=doc.content_hash,          # content_hash IS the sha256 hex digest
+        virus_status=doc.virus_scan_status,
         uploaded_at=doc.uploaded_at.isoformat(),
     )
 
