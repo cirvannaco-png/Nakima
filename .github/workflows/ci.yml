@@ -89,6 +89,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+      - name: Verify Git binary
+        run: git --version
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Run migrations

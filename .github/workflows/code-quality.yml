@@ -1,0 +1,32 @@
+name: Code Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install tools
+        run: pip install ruff==0.9.10 flake8==7.2.0
+
+      - name: Check formatting (ruff)
+        run: ruff format --check .
+
+      - name: Run lint (ruff)
+        run: ruff check .
+
+      - name: Run lint (flake8)
+        run: flake8 . --max-line-length=120 --exclude=alembic/versions,__pycache__,.git --extend-ignore=E501,W503
