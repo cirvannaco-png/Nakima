@@ -12,6 +12,7 @@ from core.config import PreflightError, preflight, settings
 from core.limiter import limiter
 from core.logging import setup_logging
 from githubapp.app import router as github_router
+from githubapp.setup import router as github_setup_router
 
 _STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -73,6 +74,8 @@ def create_app() -> FastAPI:
     app.include_router(v1_router, prefix="/api/v1")
     # GitHub App webhook receiver — HMAC verified inside the handler.
     app.include_router(github_router, prefix="/github", tags=["github"])
+    # One-time app registration flow (/github/register → /github/setup).
+    app.include_router(github_setup_router, prefix="/github", tags=["github"])
 
     # Static assets — the Command Centre dashboard and any future UI files.
     # Mounted last so the API routes above always take precedence.
