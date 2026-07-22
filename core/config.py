@@ -125,23 +125,38 @@ def preflight(s: "Settings | None" = None) -> list[str]:
     errors: list[str] = []
     warnings: list[str] = []
 
-    # AI provider must have a usable credential.
+    # AI provider credential check — warning only, not a hard error.
+    # The application can still serve webhooks, the health endpoint, repository
+    # management, and any non-AI workflow steps without a token. AI-backed
+    # features (CognitiveEngine, SecurityAgent, etc.) will fail at call-time
+    # with a clear error rather than preventing the whole process from starting.
+    # This matches how other optional integrations (ClamAV, GitHub App) are
+    # handled: degrade gracefully, don't refuse to boot.
     provider = (s.DEFAULT_AI_PROVIDER or "").lower()
     if provider == "github":
         if not (s.GITHUB_MODELS_TOKEN or s.GITHUB_TOKEN):
-            errors.append(
+            warnings.append(
                 "DEFAULT_AI_PROVIDER=github but neither GITHUB_MODELS_TOKEN "
-                "nor GITHUB_TOKEN is set."
+                "nor GITHUB_TOKEN is set — AI-backed features will be unavailable."
             )
     elif provider == "claude":
         if not s.ANTHROPIC_API_KEY:
-            errors.append("DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing.")
+            warnings.append(
+                "DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing "
+                "— AI-backed features will be unavailable."
+            )
     elif provider == "openai":
         if not s.OPENAI_API_KEY:
-            errors.append("DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing.")
+            warnings.append(
+                "DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing "
+                "— AI-backed features will be unavailable."
+            )
     elif provider == "deepseek":
         if not s.DEEPSEEK_API_KEY:
-            errors.append("DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing.")
+            warnings.append(
+                "DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing "
+                "— AI-backed features will be unavailable."
+            )
 
     # If a key path is given, verify the file actually exists before treating
     # it as "provided" — a missing file fails at JWT-signing time, not here.
