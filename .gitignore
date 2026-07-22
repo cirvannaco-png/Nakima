@@ -60,3 +60,4 @@ venv/
 
 # User-uploaded assets — not repo content
 attached_assets/
+artifacts/
