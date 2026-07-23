@@ -1,7 +1,7 @@
 # ─── Web framework ───────────────────────────────────────────────────────────
 fastapi==0.115.12
 uvicorn[standard]==0.34.3
-python-multipart==0.0.20
+python-multipart==0.0.31
 
 # ─── Database ────────────────────────────────────────────────────────────────
 sqlalchemy[asyncio]==2.0.41
@@ -19,13 +19,13 @@ httpx==0.28.1
 # ─── GitHub App auth + API client ────────────────────────────────────────────
 # PyJWT: CVE-2022-29217 fixed in >=2.4.0; pin to latest.
 # cryptography: multiple CVEs fixed across 42-44; pin to latest.
-PyJWT==2.10.1
-cryptography==45.0.3
+PyJWT==2.13.0
+cryptography==48.0.1
 PyGithub==2.6.1
 
 # ─── Git operations ──────────────────────────────────────────────────────────
 # gitpython: CVE-2024-22190 fixed in >=3.1.41; pin to latest.
-gitpython==3.1.44
+gitpython==3.1.52
 # tomli: stdlib tomllib was added in Python 3.11; provide this backport for
 # any environment running 3.10 or earlier (repository/engine.py falls back to it).
 tomli>=2.0.1; python_version < "3.11"
@@ -57,7 +57,7 @@ reportlab==4.4.1
 
 # ─── Document parsing ────────────────────────────────────────────────────────
 # pypdf: CVE-2023-36464 fixed in >=3.1.0; pin to latest.
-pypdf==5.5.0
+pypdf==6.13.3
 # python-docx: no known CVEs; latest stable.
 python-docx==1.1.2
 
