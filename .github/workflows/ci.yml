@@ -52,7 +52,7 @@ name: CI
             python-version: "3.12"
             cache: "pip"
         - name: Install safety
-          run: pip install safety==3.5.1
+          run: pip install safety==3.8.1
         - name: Audit dependencies
           continue-on-error: true
           run: safety check -r requirements.txt
