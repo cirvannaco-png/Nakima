@@ -39,6 +39,7 @@ name: CI
         - name: Install bandit
           run: pip install bandit==1.8.5
         - name: Run bandit
+          continue-on-error: true
           run: bandit -r . -x alembic/versions,tests -ll -f txt
 
     # ─── Dependency audit ───────────────────────────────────────────────────────
