@@ -20,7 +20,11 @@ def test_preflight_ok_with_github_token():
     assert any("GitHub App not configured" in w for w in warnings)
 
 
-def test_preflight_fails_when_provider_missing_token():
+def test_preflight_fails_when_provider_missing_token(monkeypatch):
+    # pydantic-settings reads env vars with higher priority than None init kwargs.
+    # Clear the token env vars so Settings actually sees None for both fields.
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_MODELS_TOKEN", raising=False)
     s = Settings(DEFAULT_AI_PROVIDER="github", GITHUB_TOKEN=None, GITHUB_MODELS_TOKEN=None)
     with pytest.raises(PreflightError):
         preflight(s)
