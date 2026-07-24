@@ -35,7 +35,7 @@ class ProviderManager:
         if provider_name not in self._instances:
             if provider_name not in self._providers:
                 raise ValueError(
-                    f"Unknown or unavailable provider: {provider_name}. " f"Available: {list(self._providers.keys())}"
+                    f"Unknown or unavailable provider: {provider_name}. Available: {list(self._providers.keys())}"
                 )
             self._instances[provider_name] = self._providers[provider_name]()
         return self._instances[provider_name]

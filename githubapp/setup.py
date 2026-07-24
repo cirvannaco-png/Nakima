@@ -49,8 +49,7 @@ _MANIFEST: dict = {
     "redirect_url": f"{_BASE_URL}/github/setup",
     "callback_urls": [f"{_BASE_URL}/github/setup"],
     "description": (
-        "Multi-agent orchestration platform that plans, executes, and verifies "
-        "code changes across GitHub repositories."
+        "Multi-agent orchestration platform that plans, executes, and verifies code changes across GitHub repositories."
     ),
     "public": False,
     "default_events": [

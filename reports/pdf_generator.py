@@ -10,7 +10,7 @@ from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func, select
@@ -99,7 +99,9 @@ class ReportGenerator:
             story.extend(self._render_section("Technical Debt", self._render_technical_debt(reality)))
             sections_included.append("technical_debt")
 
-        doc = SimpleDocTemplate(str(file_path), pagesize=LETTER, title=f"Nakima Engineering Intelligence Report — {repo.full_name}")
+        doc = SimpleDocTemplate(
+            str(file_path), pagesize=LETTER, title=f"Nakima Engineering Intelligence Report — {repo.full_name}"
+        )
         doc.build(story)
 
         report = EngineeringReport(
@@ -126,9 +128,7 @@ class ReportGenerator:
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def _active_intent(self) -> UserIntent | None:
-        stmt = select(UserIntent).where(
-            UserIntent.repository_id == self.repository_id, UserIntent.is_active.is_(True)
-        )
+        stmt = select(UserIntent).where(UserIntent.repository_id == self.repository_id, UserIntent.is_active.is_(True))
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def _active_roadmap(self) -> EvolutionRoadmap | None:
@@ -148,9 +148,7 @@ class ReportGenerator:
         return list((await self.session.execute(stmt)).scalars().all())
 
     async def _next_version(self) -> int:
-        stmt = select(func.max(EngineeringReport.version)).where(
-            EngineeringReport.repository_id == self.repository_id
-        )
+        stmt = select(func.max(EngineeringReport.version)).where(EngineeringReport.repository_id == self.repository_id)
         current_max = (await self.session.execute(stmt)).scalar_one_or_none()
         return (current_max or 0) + 1
 
@@ -226,9 +224,7 @@ class ReportGenerator:
         if intent.constraints:
             flowables.append(Paragraph("Constraints: " + "; ".join(intent.constraints), self.styles["BodyText"]))
         if intent_confidence.missing:
-            flowables.append(
-                Paragraph("Gaps: " + "; ".join(intent_confidence.missing), self.styles["BodyText"])
-            )
+            flowables.append(Paragraph("Gaps: " + "; ".join(intent_confidence.missing), self.styles["BodyText"]))
         return flowables
 
     def _render_decisions(self, decisions) -> list:
@@ -240,14 +236,18 @@ class ReportGenerator:
     def _render_events(self, events) -> list:
         rows = [["Date", "Task", "Verification", "Risk"]]
         for e in events:
-            rows.append([e.timestamp.strftime("%Y-%m-%d"), e.task_description[:60], e.verification_status, e.risk_level])
+            rows.append(
+                [e.timestamp.strftime("%Y-%m-%d"), e.task_description[:60], e.verification_status, e.risk_level]
+            )
         return [self._table(rows)]
 
     def _render_roadmap(self, roadmap: EvolutionRoadmap) -> list:
         flowables = [Paragraph(roadmap.summary, self.styles["BodyText"]), Spacer(1, 0.1 * inch)]
         rows = [["Priority", "Category", "Title", "Effort"]]
         for item in sorted(roadmap.items, key=lambda i: i.priority_score, reverse=True)[:_MAX_ROADMAP_ITEMS]:
-            rows.append([f"{item.priority_score:.1f}", item.category.value, item.title[:60], item.effort_estimate.value])
+            rows.append(
+                [f"{item.priority_score:.1f}", item.category.value, item.title[:60], item.effort_estimate.value]
+            )
         flowables.append(self._table(rows))
         return flowables
 

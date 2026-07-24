@@ -19,8 +19,7 @@ class DocumentationAgent(BaseAgent):
         existing = readme.read_text() if readme.exists() else ""
 
         response = await self.provider.generate(
-            f"Update the project README to reflect these changes: {params['changes']}\n\n"
-            f"Current README:\n{existing}",
+            f"Update the project README to reflect these changes: {params['changes']}\n\nCurrent README:\n{existing}",
             {"repo_dir": str(repo_dir)},
         )
 

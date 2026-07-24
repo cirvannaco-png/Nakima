@@ -61,9 +61,7 @@ class ArbitrationEngine:
             )
             return ArbitrationResult(DriftVerdict.REQUEST_CONFIRMATION, reasoning)
 
-        reasoning.append(
-            f"No hard constraint violations found; intent confidence {intent_confidence.score:.2f}."
-        )
+        reasoning.append(f"No hard constraint violations found; intent confidence {intent_confidence.score:.2f}.")
         reasoning.append(
             f"Cognitive assessment ({cognitive.source}): {cognitive.alignment} "
             f"(confidence {cognitive.confidence:.2f}) — {cognitive.explanation}"

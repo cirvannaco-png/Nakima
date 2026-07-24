@@ -111,6 +111,7 @@ else:
 
 trace.set_tracer_provider(_provider)
 
+
 # Convenience accessor — callers should use this rather than
 # opentelemetry.trace.get_tracer() directly so they get the right provider.
 def get_tracer(name: str = _SERVICE_NAME):

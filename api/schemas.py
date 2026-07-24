@@ -124,14 +124,14 @@ class DocumentResponse(BaseModel):
     filename: str
     file_type: str
     size_bytes: int
-    size_kb: float          # size_bytes / 1024, rounded to 1 dp — convenience for UI
+    size_kb: float  # size_bytes / 1024, rounded to 1 dp — convenience for UI
     version: int
     status: str
     rejection_reason: str | None
     extracted_text_preview: str | None
     is_duplicate: bool = False
-    sha256: str | None      # first 64 hex chars of content_hash (sha256 of file bytes)
-    virus_status: str       # "clean" | "infected" | "unavailable" | "error"
+    sha256: str | None  # first 64 hex chars of content_hash (sha256 of file bytes)
+    virus_status: str  # "clean" | "infected" | "unavailable" | "error"
     uploaded_at: str
 
 

@@ -53,8 +53,13 @@ def test_preflight_production_requires_strong_secrets():
 def test_json_formatter_emits_valid_json_with_extras():
     fmt = JsonFormatter()
     rec = logging.LogRecord(
-        name="nakima.test", level=logging.INFO, pathname=__file__, lineno=1,
-        msg="hello %s", args=("world",), exc_info=None,
+        name="nakima.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello %s",
+        args=("world",),
+        exc_info=None,
     )
     rec.request_id = "abc-123"
     line = fmt.format(rec)
@@ -69,8 +74,13 @@ def test_json_formatter_emits_valid_json_with_extras():
 def test_json_formatter_handles_non_serializable_extra():
     fmt = JsonFormatter()
     rec = logging.LogRecord(
-        name="x", level=logging.WARNING, pathname=__file__, lineno=1,
-        msg="m", args=(), exc_info=None,
+        name="x",
+        level=logging.WARNING,
+        pathname=__file__,
+        lineno=1,
+        msg="m",
+        args=(),
+        exc_info=None,
     )
     rec.thing = object()
     payload = json.loads(fmt.format(rec))

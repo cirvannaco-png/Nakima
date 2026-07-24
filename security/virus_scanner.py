@@ -83,9 +83,13 @@ class VirusScannerUnavailable(Exception):
 
 class VirusScanner:
     def __init__(self):
-        self._client = clamd.ClamdNetworkSocket(
-            host=settings.CLAMD_HOST, port=settings.CLAMD_PORT, timeout=settings.CLAMD_TIMEOUT_SECONDS
-        ) if settings.CLAMD_HOST else None
+        self._client = (
+            clamd.ClamdNetworkSocket(
+                host=settings.CLAMD_HOST, port=settings.CLAMD_PORT, timeout=settings.CLAMD_TIMEOUT_SECONDS
+            )
+            if settings.CLAMD_HOST
+            else None
+        )
 
     def is_configured(self) -> bool:
         return self._client is not None
@@ -101,7 +105,8 @@ class VirusScanner:
 
         if len(content) > _MAX_SCAN_BYTES:
             return VirusScanResult(
-                status="error", detail=f"File is {len(content)} bytes, over clamd's {_MAX_SCAN_BYTES}-byte stream limit."
+                status="error",
+                detail=f"File is {len(content)} bytes, over clamd's {_MAX_SCAN_BYTES}-byte stream limit.",
             )
 
         try:

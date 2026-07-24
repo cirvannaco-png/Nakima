@@ -19,7 +19,7 @@ target_url is set at all, covering both.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -93,7 +93,9 @@ class SecurityIntelligenceLayer:
 
         try:
             for secret_finding in SecretScanner().scan(repo_dir):
-                fp = fingerprint("secret", secret_finding.pattern_name, secret_finding.file_path, secret_finding.line_number)
+                fp = fingerprint(
+                    "secret", secret_finding.pattern_name, secret_finding.file_path, secret_finding.line_number
+                )
                 current[fp] = {
                     "source": "secret",
                     "rule": secret_finding.pattern_name,
@@ -259,7 +261,7 @@ class SecurityIntelligenceLayer:
         stmt = select(SecurityFinding).where(SecurityFinding.repository_id == self.repository_id)
         existing = {f.fingerprint: f for f in (await self.session.execute(stmt)).scalars().all()}
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         new_count = 0
 
         for fp, data in current.items():

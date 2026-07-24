@@ -99,8 +99,7 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:
         if not self.DATABASE_URL:
             self.DATABASE_URL = (
-                f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-                f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+                f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             )
         if not self.REDIS_URL:
             self.REDIS_URL = f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
@@ -110,6 +109,7 @@ settings = Settings()
 
 
 # --- Runtime preflight -----------------------------------------------------
+
 
 class PreflightError(RuntimeError):
     """Raised when required configuration is missing or invalid."""
@@ -142,30 +142,27 @@ def preflight(s: "Settings | None" = None) -> list[str]:
     elif provider == "claude":
         if not s.ANTHROPIC_API_KEY:
             warnings.append(
-                "DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing "
-                "— AI-backed features will be unavailable."
+                "DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing — AI-backed features will be unavailable."
             )
     elif provider == "openai":
         if not s.OPENAI_API_KEY:
             warnings.append(
-                "DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing "
-                "— AI-backed features will be unavailable."
+                "DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing — AI-backed features will be unavailable."
             )
     elif provider == "deepseek":
         if not s.DEEPSEEK_API_KEY:
             warnings.append(
-                "DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing "
-                "— AI-backed features will be unavailable."
+                "DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing — AI-backed features will be unavailable."
             )
 
     # If a key path is given, verify the file actually exists before treating
     # it as "provided" — a missing file fails at JWT-signing time, not here.
     if s.GITHUB_PRIVATE_KEY_PATH:
         import os  # noqa: PLC0415
+
         if not os.path.isfile(s.GITHUB_PRIVATE_KEY_PATH):
             errors.append(
-                f"GITHUB_PRIVATE_KEY_PATH={s.GITHUB_PRIVATE_KEY_PATH!r} does not exist "
-                "or is not a regular file."
+                f"GITHUB_PRIVATE_KEY_PATH={s.GITHUB_PRIVATE_KEY_PATH!r} does not exist or is not a regular file."
             )
 
     # GitHub App: optional overall, but if partly set, all three must be present.
@@ -189,7 +186,5 @@ def preflight(s: "Settings | None" = None) -> list[str]:
             errors.append("ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET.")
 
     if errors:
-        raise PreflightError(
-            "Configuration preflight failed:\n  - " + "\n  - ".join(errors)
-        )
+        raise PreflightError("Configuration preflight failed:\n  - " + "\n  - ".join(errors))
     return warnings

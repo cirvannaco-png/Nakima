@@ -128,8 +128,6 @@ class ProjectUploadGateway:
         return (await self.session.execute(stmt)).scalars().first()
 
     async def _next_version(self) -> int:
-        stmt = select(func.max(ProjectDocument.version)).where(
-            ProjectDocument.repository_id == self.repository_id
-        )
+        stmt = select(func.max(ProjectDocument.version)).where(ProjectDocument.repository_id == self.repository_id)
         current_max = (await self.session.execute(stmt)).scalar_one_or_none()
         return (current_max or 0) + 1

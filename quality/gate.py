@@ -66,9 +66,7 @@ class QualityGate:
         if has_test_changes:
             return QualityGateResult(
                 verdict=QualityVerdict.APPROVE,
-                reasoning=[
-                    f"{len(test_files)} test file(s) touched alongside {len(source_files)} source file(s)."
-                ],
+                reasoning=[f"{len(test_files)} test file(s) touched alongside {len(source_files)} source file(s)."],
                 has_test_changes=True,
             )
 

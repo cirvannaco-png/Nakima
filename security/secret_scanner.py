@@ -22,7 +22,11 @@ from neis.analyzers.project_modeler import IGNORED_DIRS
 # maintaining a second copy of the same patterns.
 SECRET_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("aws_access_key_id", re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "critical"),
-    ("aws_secret_access_key", re.compile(r"(?i)aws_secret_access_key\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"), "critical"),
+    (
+        "aws_secret_access_key",
+        re.compile(r"(?i)aws_secret_access_key\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"),
+        "critical",
+    ),
     ("github_pat", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"), "critical"),
     ("github_fine_grained_pat", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{22,}\b"), "critical"),
     ("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "high"),

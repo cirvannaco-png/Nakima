@@ -367,11 +367,7 @@ class WorkflowOrchestrator:
             await DecisionRegistry(session, repo.id).record(
                 context=f"Security Gate for issue #{issue['number']}: {issue['title']}",
                 problem="Secret and configuration security scan of the working tree before push.",
-                decision=(
-                    "Blocked"
-                    if security_gate_should_block(nsil_result)
-                    else "Approved"
-                ),
+                decision=("Blocked" if security_gate_should_block(nsil_result) else "Approved"),
                 justification=(
                     f"Security score {nsil_result.score:.0f}/100; "
                     f"{nsil_result.counts_by_severity.get('critical', 0)} critical, "

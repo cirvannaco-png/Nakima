@@ -73,8 +73,7 @@ class InnovationReasoningEngine:
                         "category": RecommendationCategory.ARCHITECTURE,
                         "title": f"Split {p.get('subject', 'class')}",
                         "rationale": p.get("summary", ""),
-                        "priority_score": min(method_count / 5.0, 10.0)
-                        * weights.get("architecture", DEFAULT_WEIGHT),
+                        "priority_score": min(method_count / 5.0, 10.0) * weights.get("architecture", DEFAULT_WEIGHT),
                         "effort_estimate": EffortEstimate.LARGE,
                     }
                 )

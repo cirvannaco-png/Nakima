@@ -46,7 +46,20 @@ extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S"]
-ignore = ["E501", "S101", "S603", "S607"]
+ignore = ["E501", "S101", "S603", "S607", "S108"]
+
+[tool.ruff.lint.per-file-ignores]
+# Silent exception handling is intentional in these files (documented with inline comments)
+"agents/analysis.py" = ["S112"]
+"repository/health.py" = ["S112"]
+"repository/engine.py" = ["S110", "S112"]
+"api/v1/endpoints/tasks.py" = ["S110"]
+"neis/reasoning/decision_engine.py" = ["S110"]
+"neis/services/evolution_service.py" = ["S110"]
+"planner/context_builder.py" = ["S110"]
+# Default credentials in config and fake credentials in tests are intentional
+"core/config.py" = ["S105"]
+"tests/*.py" = ["S105", "S106"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "alembic/versions"]

@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -56,7 +56,9 @@ class EvolutionRoadmap(Base):
     # source of recommendations that skip the items table.
     summary: Mapped[str] = mapped_column(Text)
 
-    generated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), index=True
+    )
 
     items: Mapped[list["EvolutionRoadmapItem"]] = relationship(back_populates="roadmap")
 
@@ -76,6 +78,6 @@ class EvolutionRoadmapItem(Base):
     effort_estimate: Mapped[EffortEstimate] = mapped_column(Enum(EffortEstimate))
     status: Mapped[ItemStatus] = mapped_column(Enum(ItemStatus), default=ItemStatus.PROPOSED)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     roadmap: Mapped[EvolutionRoadmap] = relationship(back_populates="items")

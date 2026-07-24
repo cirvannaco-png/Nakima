@@ -53,12 +53,8 @@ async def test_decision_registry_is_append_only_ordering(db_session):
     repo = await _make_repo(db_session)
     registry = DecisionRegistry(db_session, repo.id)
 
-    first = await registry.record(
-        context="c1", problem="p1", decision="d1", justification="j1"
-    )
-    second = await registry.record(
-        context="c2", problem="p2", decision="d2", justification="j2"
-    )
+    first = await registry.record(context="c1", problem="p1", decision="d1", justification="j1")
+    second = await registry.record(context="c2", problem="p2", decision="d2", justification="j2")
 
     listed = await registry.list_for_repository()
     # Most recent first.

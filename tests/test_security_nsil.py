@@ -13,7 +13,6 @@ from security.nsil import SecurityIntelligenceLayer
 from security.risk_scoring import RiskScorer
 from security.secret_scanner import SecretScanner
 
-
 # ---------------------------------------------------------------------------
 # SecretScanner
 # ---------------------------------------------------------------------------
@@ -70,15 +69,13 @@ def test_secret_scanner_clean_repo_has_no_findings(tmp_path):
 
 
 def test_config_scanner_flags_dockerfile_without_user(tmp_path):
-    (tmp_path / "Dockerfile").write_text("FROM python:3.12-slim\nCOPY . .\nCMD [\"python\", \"app.py\"]\n")
+    (tmp_path / "Dockerfile").write_text('FROM python:3.12-slim\nCOPY . .\nCMD ["python", "app.py"]\n')
     findings = ConfigSecurityScanner().scan(tmp_path)
     assert any(f.rule == "dockerfile_no_user" for f in findings)
 
 
 def test_config_scanner_does_not_flag_dockerfile_with_user(tmp_path):
-    (tmp_path / "Dockerfile").write_text(
-        "FROM python:3.12-slim\nCOPY . .\nUSER appuser\nCMD [\"python\", \"app.py\"]\n"
-    )
+    (tmp_path / "Dockerfile").write_text('FROM python:3.12-slim\nCOPY . .\nUSER appuser\nCMD ["python", "app.py"]\n')
     findings = ConfigSecurityScanner().scan(tmp_path)
     assert not any(f.rule == "dockerfile_no_user" for f in findings)
 
@@ -118,8 +115,7 @@ def test_config_scanner_flags_echoed_secret(tmp_path):
     workflows = tmp_path / ".github" / "workflows"
     workflows.mkdir(parents=True)
     (workflows / "ci.yml").write_text(
-        "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n"
-        "      - run: echo ${{ secrets.API_KEY }}\n"
+        "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ secrets.API_KEY }}\n"
     )
     findings = ConfigSecurityScanner().scan(tmp_path)
     assert any(f.rule == "workflow_secret_echoed" for f in findings)

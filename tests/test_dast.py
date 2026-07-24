@@ -13,7 +13,6 @@ import security.dast as dast_mod
 import security.ssrf_guard as ssrf_guard_mod
 from security.dast import DASTScanner
 
-
 # ---------------------------------------------------------------------------
 # SSRF guard — no network needed, IP literals resolve locally
 # ---------------------------------------------------------------------------
@@ -66,9 +65,7 @@ async def test_unresolvable_hostname_refused(monkeypatch):
 
 
 def _patch_public_dns(monkeypatch):
-    monkeypatch.setattr(
-        ssrf_guard_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("93.184.216.34", 0))]
-    )
+    monkeypatch.setattr(ssrf_guard_mod.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("93.184.216.34", 0))])
 
 
 class _FakeAsyncClient:
@@ -111,7 +108,9 @@ async def test_https_target_with_good_headers_has_no_header_findings(monkeypatch
         "x-frame-options": "DENY",
         "content-security-policy": "default-src 'self'",
     }
-    root = httpx.Response(200, headers=good_headers, text="hello", request=httpx.Request("GET", "https://example.test/"))
+    root = httpx.Response(
+        200, headers=good_headers, text="hello", request=httpx.Request("GET", "https://example.test/")
+    )
     probe = httpx.Response(404, headers={}, text="not found", request=httpx.Request("GET", "https://example.test/x"))
     _patch_client(monkeypatch, [root, probe])
 

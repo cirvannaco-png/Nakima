@@ -48,7 +48,8 @@ async def run_security_scan(
         # merely asserts.
         if not req.github_token:
             raise HTTPException(
-                status_code=400, detail="github_token is required when target_url is supplied — see security/target_binding.py."
+                status_code=400,
+                detail="github_token is required when target_url is supplied — see security/target_binding.py.",
             )
         try:
             authorized = await RepoTargetBinding(repo_full_name, req.github_token).is_authorized(req.target_url)

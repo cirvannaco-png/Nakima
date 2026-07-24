@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ router = APIRouter()
 
 
 # ── Request / response shapes ──────────────────────────────────────────────────
+
 
 class TaskCreateRequest(BaseModel):
     repo_full_name: str
@@ -73,6 +74,7 @@ async def _get_or_create_repo(db: AsyncSession, repo_full_name: str) -> Reposito
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/", response_model=TaskResponse)
 async def create_task(
     req: TaskCreateRequest,
@@ -90,7 +92,7 @@ async def create_task(
             "issue_number": req.issue_number,
             "repo_full_name": req.repo_full_name,
             "github_token": bool(req.github_token),  # store presence only — never store tokens
-            "triggered_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "triggered_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             "source": "dashboard",
         },
     )
@@ -102,7 +104,9 @@ async def create_task(
     # Import here to avoid circular import at module level.
     try:
         import asyncio
+
         from orchestrator.workflow import run_task
+
         asyncio.create_task(
             run_task(
                 task_id=task.id,
@@ -135,11 +139,11 @@ async def list_tasks(
     if status:
         try:
             stmt = stmt.where(Task.status == TaskStatus(status))
-        except ValueError:
+        except ValueError as err:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid status '{status}'. Valid values: {[s.value for s in TaskStatus]}",
-            )
+            ) from err
     rows = (await db.execute(stmt)).all()
     return [_task_to_response(task, full_name) for task, full_name in rows]
 

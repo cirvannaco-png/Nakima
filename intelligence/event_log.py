@@ -43,8 +43,7 @@ class EventLog:
             raise ValueError(f"risk_level must be one of {sorted(VALID_RISK_LEVELS)}, got {risk_level!r}")
         if verification_status not in VALID_VERIFICATION_STATUSES:
             raise ValueError(
-                f"verification_status must be one of {sorted(VALID_VERIFICATION_STATUSES)}, "
-                f"got {verification_status!r}"
+                f"verification_status must be one of {sorted(VALID_VERIFICATION_STATUSES)}, got {verification_status!r}"
             )
 
         row = EngineeringEvent(

@@ -18,7 +18,6 @@ from neis.reasoning.cognitive_engine import CognitiveAssessment, CognitiveEngine
 from neis.reasoning.decision_engine import DecisionEngine
 from neis.reasoning.evidence_engine import EvidenceEngine
 
-
 # ---------------------------------------------------------------------------
 # EvidenceEngine
 # ---------------------------------------------------------------------------

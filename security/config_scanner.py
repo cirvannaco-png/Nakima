@@ -121,8 +121,10 @@ class ConfigSecurityScanner:
         findings = []
 
         triggers = doc.get(True) or doc.get("on") or {}  # PyYAML parses bare `on:` key as boolean True in YAML 1.1
-        trigger_names = set(triggers) if isinstance(triggers, dict) else (
-            {triggers} if isinstance(triggers, str) else set(triggers or [])
+        trigger_names = (
+            set(triggers)
+            if isinstance(triggers, dict)
+            else ({triggers} if isinstance(triggers, str) else set(triggers or []))
         )
         has_pull_request_target = "pull_request_target" in trigger_names
         has_checkout_of_pr_head = bool(re.search(r"(?i)ref:\s*\$\{\{\s*github\.event\.pull_request\.head", raw_text))
