@@ -56,9 +56,7 @@ jobs:
         run: pip install safety==3.8.1
       - name: Audit dependencies
         continue-on-error: true
-        # safety v3 replaced "check" with "scan"; --continue-on-vuln-error
-        # prevents a non-zero exit when vulnerabilities are found
-        run: safety scan -r requirements.txt --continue-on-vuln-error
+        run: safety check -r requirements.txt
 
   # --- Tests ---
   test:
@@ -138,10 +136,7 @@ jobs:
       - name: Build image for scanning
         run: docker build -t nakima:trivy .
       - name: Run Trivy vulnerability scanner
-        continue-on-error: true
-        # exit-code 1 would block every push while the image has unfixed CVEs;
-        # results are still visible in the Actions log for remediation tracking
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "nakima:trivy"
           format: "table"
