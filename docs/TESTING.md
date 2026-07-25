@@ -72,9 +72,15 @@ Never make real outbound network calls in tests. Use `monkeypatch` to replace `h
 ```python
 def _patch_client(monkeypatch, responses):
     class _MockClient:
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return None
-        async def get(self, url, **kw): return responses.pop(0)
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, **kw):
+            return responses.pop(0)
+
     monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: _MockClient())
 ```
 
