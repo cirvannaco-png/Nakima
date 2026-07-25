@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from database.base import Base
 
 
-class NodeType(str, enum.Enum):
+class NodeType(enum.StrEnum):
     FILE = "file"
     CLASS = "class"
     FUNCTION = "function"
@@ -19,7 +19,7 @@ class NodeType(str, enum.Enum):
     TEST = "test"
 
 
-class EdgeType(str, enum.Enum):
+class EdgeType(enum.StrEnum):
     IMPORTS = "imports"
     CALLS = "calls"
     INHERITS = "inherits"
