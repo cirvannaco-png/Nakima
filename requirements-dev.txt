@@ -1,12 +1,11 @@
 -r requirements.txt
-    pytest==8.3.5
-    pytest-asyncio==0.24.0
-    pytest-cov==6.1.0
-    aiosqlite==0.20.0
-    httpx==0.28.1
 
-    # SAST / linting
-    bandit==1.8.5
-    ruff==0.9.10
-    flake8==7.2.0
-    
+# pytest-asyncio>=0.25.0 is required for pytest>=9 compatibility (0.24.x required pytest<9).
+pytest>=9.0.3
+pytest-asyncio>=0.25.0
+pytest-cov>=6.1.0
+
+# SAST / linting
+bandit>=1.8.5
+ruff>=0.9.10
+flake8>=7.2.0
