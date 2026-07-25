@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from database.base import Base
 
 
-class Ecosystem(str, enum.Enum):
+class Ecosystem(enum.StrEnum):
     PYPI = "pypi"
     NPM = "npm"
 
