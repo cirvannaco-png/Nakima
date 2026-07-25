@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 
-class QualityVerdict(str, enum.Enum):
+class QualityVerdict(enum.StrEnum):
     APPROVE = "approve"
     WARN = "warn"
 
