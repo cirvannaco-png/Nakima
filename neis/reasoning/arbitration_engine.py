@@ -19,7 +19,7 @@ from neis.reasoning.evidence_engine import IntentConfidenceResult
 MISALIGNMENT_CONFIDENCE_THRESHOLD = 0.6
 
 
-class DriftVerdict(str, enum.Enum):
+class DriftVerdict(enum.StrEnum):
     APPROVE = "approve"
     WARN = "warn"
     REQUEST_CONFIRMATION = "request_confirmation"
