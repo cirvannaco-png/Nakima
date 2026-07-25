@@ -8,12 +8,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database.base import Base
 
 
-class RoadmapStatus(str, enum.Enum):
+class RoadmapStatus(enum.StrEnum):
     ACTIVE = "active"
     SUPERSEDED = "superseded"
 
 
-class RecommendationCategory(str, enum.Enum):
+class RecommendationCategory(enum.StrEnum):
     DEPENDENCY = "dependency"
     ARCHITECTURE = "architecture"
     TESTING = "testing"
@@ -21,13 +21,13 @@ class RecommendationCategory(str, enum.Enum):
     DOCUMENTATION = "documentation"
 
 
-class EffortEstimate(str, enum.Enum):
+class EffortEstimate(enum.StrEnum):
     SMALL = "small"
     MEDIUM = "medium"
     LARGE = "large"
 
 
-class ItemStatus(str, enum.Enum):
+class ItemStatus(enum.StrEnum):
     PROPOSED = "proposed"
     ACCEPTED = "accepted"
     DISMISSED = "dismissed"
