@@ -52,7 +52,7 @@ radon>=6.0.1
 slowapi>=0.1.9
 
 # ─── Semver comparison ───────────────────────────────────────────────────────
-packaging>=25.0
+packaging>=26.2
 
 # ─── PDF report generation ───────────────────────────────────────────────────
 reportlab>=4.4.1
