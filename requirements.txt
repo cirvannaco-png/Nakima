@@ -24,7 +24,7 @@ httpx>=0.28.1
 # cryptography: GHSA-537c-gmf6-5ccf fixed in >=48.0.1; enforce minimum safe version.
 PyJWT>=2.13.0
 cryptography>=48.0.1
-PyGithub>=2.6.1
+PyGithub>=2.9.1
 
 # ─── Git operations ──────────────────────────────────────────────────────────
 # gitpython: GHSA-6p8h-3wgx-97gf (and 11 other CVEs) fixed in >=3.1.54; enforce minimum safe version.
