@@ -13,16 +13,25 @@ down_revision = "0001"
 branch_labels = None
 depends_on = None
 
+# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# op.create_table(); we control type creation explicitly with checkfirst=True
+# so re-running the migration on a database that already has the type is safe.
 node_type = sa.Enum(
     "file", "class", "function", "method", "variable", "import", "api_endpoint", "test",
     name="nodetype",
+    create_type=False,
 )
 edge_type = sa.Enum(
-    "imports", "calls", "inherits", "contains", "depends_on", "tests", name="edgetype"
+    "imports", "calls", "inherits", "contains", "depends_on", "tests",
+    name="edgetype",
+    create_type=False,
 )
 
 
 def upgrade() -> None:
+    node_type.create(op.get_bind(), checkfirst=True)
+    edge_type.create(op.get_bind(), checkfirst=True)
+
     op.create_table(
         "graph_nodes",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -94,5 +103,5 @@ def downgrade() -> None:
     op.drop_table("knowledge_nodes")
     op.drop_table("graph_edges")
     op.drop_table("graph_nodes")
-    edge_type.drop(op.get_bind(), checkfirst=False)
-    node_type.drop(op.get_bind(), checkfirst=False)
+    edge_type.drop(op.get_bind(), checkfirst=True)
+    node_type.drop(op.get_bind(), checkfirst=True)

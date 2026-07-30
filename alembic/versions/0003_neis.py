@@ -14,16 +14,27 @@ down_revision = "0002"
 branch_labels = None
 depends_on = None
 
-ecosystem = sa.Enum("pypi", "npm", name="ecosystem")
-roadmap_status = sa.Enum("active", "superseded", name="roadmapstatus")
+# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# op.create_table(); we control type creation explicitly with checkfirst=True
+# so re-running the migration on a database that already has the type is safe.
+ecosystem = sa.Enum("pypi", "npm", name="ecosystem", create_type=False)
+roadmap_status = sa.Enum("active", "superseded", name="roadmapstatus", create_type=False)
 recommendation_category = sa.Enum(
-    "dependency", "architecture", "testing", "security", "documentation", name="recommendationcategory"
+    "dependency", "architecture", "testing", "security", "documentation",
+    name="recommendationcategory",
+    create_type=False,
 )
-effort_estimate = sa.Enum("small", "medium", "large", name="effortestimate")
-item_status = sa.Enum("proposed", "accepted", "dismissed", "completed", name="itemstatus")
+effort_estimate = sa.Enum("small", "medium", "large", name="effortestimate", create_type=False)
+item_status = sa.Enum("proposed", "accepted", "dismissed", "completed", name="itemstatus", create_type=False)
 
 
 def upgrade() -> None:
+    ecosystem.create(op.get_bind(), checkfirst=True)
+    roadmap_status.create(op.get_bind(), checkfirst=True)
+    recommendation_category.create(op.get_bind(), checkfirst=True)
+    effort_estimate.create(op.get_bind(), checkfirst=True)
+    item_status.create(op.get_bind(), checkfirst=True)
+
     op.create_table(
         "project_reality_models",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -104,8 +115,8 @@ def downgrade() -> None:
     op.drop_table("evolution_roadmaps")
     op.drop_table("technology_intel")
     op.drop_table("project_reality_models")
-    item_status.drop(op.get_bind(), checkfirst=False)
-    effort_estimate.drop(op.get_bind(), checkfirst=False)
-    recommendation_category.drop(op.get_bind(), checkfirst=False)
-    roadmap_status.drop(op.get_bind(), checkfirst=False)
-    ecosystem.drop(op.get_bind(), checkfirst=False)
+    item_status.drop(op.get_bind(), checkfirst=True)
+    effort_estimate.drop(op.get_bind(), checkfirst=True)
+    recommendation_category.drop(op.get_bind(), checkfirst=True)
+    roadmap_status.drop(op.get_bind(), checkfirst=True)
+    ecosystem.drop(op.get_bind(), checkfirst=True)

@@ -12,10 +12,15 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-task_status = sa.Enum("pending", "in_progress", "success", "failed", name="taskstatus")
+# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# op.create_table(); we control type creation explicitly with checkfirst=True
+# so re-running the migration on a database that already has the type is safe.
+task_status = sa.Enum("pending", "in_progress", "success", "failed", name="taskstatus", create_type=False)
 
 
 def upgrade() -> None:
+    task_status.create(op.get_bind(), checkfirst=True)
+
     op.create_table(
         "repositories",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
@@ -43,4 +48,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("tasks")
     op.drop_table("repositories")
-    task_status.drop(op.get_bind(), checkfirst=False)
+    task_status.drop(op.get_bind(), checkfirst=True)
