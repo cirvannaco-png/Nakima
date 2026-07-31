@@ -1,15 +1,39 @@
 import asyncio
+import logging
 from pathlib import Path
 
 import docker
 
 from core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 class SandboxExecutor:
+    """Runs commands in isolated Docker containers.
+
+    Docker availability is checked lazily on the first _run_in_container call
+    — constructing a SandboxExecutor never fails even when no Docker daemon is
+    reachable (e.g. Render's native Python environment, CI without DinD).
+    When Docker is unavailable each call returns a structured failure dict
+    with a clear message so ValidationPipeline can degrade gracefully and
+    _fail_task() gets a human-readable error instead of a raw DockerException.
+    """
+
     def __init__(self):
-        self.client = docker.from_env()
+        self._client: docker.DockerClient | None = None
         self.image = settings.SANDBOX_IMAGE
+
+    def _get_client(self) -> docker.DockerClient:
+        """Lazily initialise the Docker client.
+
+        Raises docker.errors.DockerException if the daemon is not reachable.
+        Called only at the start of an actual container operation so that
+        importing this module and constructing SandboxExecutor never fail.
+        """
+        if self._client is None:
+            self._client = docker.from_env()
+        return self._client
 
     async def run_build(self, repo_dir: Path, commands: list, network_disabled: bool = True) -> dict:
         return await self._run_in_container(repo_dir, commands, network_disabled=network_disabled)
@@ -31,9 +55,23 @@ class SandboxExecutor:
         thread-pool worker via asyncio.to_thread() so they never stall the
         FastAPI event loop.
         """
+        try:
+            client = self._get_client()
+        except docker.errors.DockerException as exc:
+            logger.warning("Docker daemon not available; sandbox execution skipped: %s", exc)
+            return {
+                "success": False,
+                "logs": (
+                    f"Docker daemon not available on this host: {exc}\n"
+                    "Sandbox validation requires a running Docker daemon. "
+                    "Enable Docker-in-Docker (DinD) for the deployment environment, "
+                    "or run Nakima on a host with Docker installed and accessible."
+                ),
+                "command": commands[0] if commands else "",
+            }
 
         def _start_container():
-            return self.client.containers.run(
+            return client.containers.run(
                 self.image,
                 command="tail -f /dev/null",  # keep alive so we can exec into it
                 detach=True,

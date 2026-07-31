@@ -7,14 +7,24 @@ RISK_WORDS = ["migration", "schema", "auth", "authentication", "security", "data
 
 class PlanningEngine:
     def __init__(self, provider_name: str | None = None):
-        self.provider = provider_manager.get_provider(provider_name)
+        self._provider_name = provider_name
+        self._provider = None
+
+    def _get_provider(self):
+        """Resolve the provider lazily so a misconfigured DEFAULT_AI_PROVIDER
+        surfaces as a task failure with a clear message instead of an opaque
+        ValueError crashing _run_pipeline before any work is logged."""
+        if self._provider is None:
+            self._provider = provider_manager.get_provider(self._provider_name)
+        return self._provider
 
     async def create_plan(self, requirement: str, repo_context: dict[str, Any]) -> dict:
-        analysis = await self.provider.analyze(
+        provider = self._get_provider()
+        analysis = await provider.analyze(
             code=repo_context.get("structure_summary", ""),
             context={"requirement": requirement},
         )
-        plan = await self.provider.plan(requirement, repo_context)
+        plan = await provider.plan(requirement, repo_context)
         risk = self._estimate_risk(plan.content)
 
         return {

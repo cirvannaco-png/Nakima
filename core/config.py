@@ -144,16 +144,16 @@ def preflight(s: "Settings | None" = None) -> list[str]:
             warnings.append(
                 "DEFAULT_AI_PROVIDER=claude but ANTHROPIC_API_KEY is missing — AI-backed features will be unavailable."
             )
-    elif provider == "openai":
-        if not s.OPENAI_API_KEY:
-            warnings.append(
-                "DEFAULT_AI_PROVIDER=openai but OPENAI_API_KEY is missing — AI-backed features will be unavailable."
-            )
-    elif provider == "deepseek":
-        if not s.DEEPSEEK_API_KEY:
-            warnings.append(
-                "DEFAULT_AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing — AI-backed features will be unavailable."
-            )
+    elif provider in ("openai", "deepseek"):
+        # These providers are referenced in settings but not yet implemented
+        # in providers/manager.py. Any call to provider_manager.get_provider()
+        # with one of these names will raise ValueError at runtime. Use
+        # DEFAULT_AI_PROVIDER=github (default) or DEFAULT_AI_PROVIDER=claude.
+        warnings.append(
+            f"DEFAULT_AI_PROVIDER={provider!r} is not yet implemented. "
+            f"Supported providers: 'github' (default), 'claude'. "
+            f"AI-backed features will fail at call-time with an unknown-provider error."
+        )
 
     # If a key path is given, verify the file actually exists before treating
     # it as "provided" — a missing file fails at JWT-signing time, not here.
