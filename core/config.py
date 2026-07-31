@@ -180,10 +180,30 @@ def preflight(s: "Settings | None" = None) -> list[str]:
         )
 
     if s.ENVIRONMENT == "production":
-        if s.DB_PASSWORD in ("", "nakima", "changeme"):
-            errors.append("ENVIRONMENT=production but DB_PASSWORD is a default/empty value.")
-        if not s.GITHUB_WEBHOOK_SECRET:
-            errors.append("ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET.")
+        # Only validate DB_PASSWORD when DATABASE_URL was built from individual
+        # parts — i.e. no explicit DATABASE_URL was provided.  PaaS platforms
+        # like Render inject DATABASE_URL directly; in that case DB_PASSWORD
+        # keeps its default value ("nakima") even though the real password is
+        # embedded in the URL, so the check would be a false positive that
+        # prevents startup.
+        db_url_from_parts = (
+            f"postgresql+asyncpg://{s.DB_USER}:{s.DB_PASSWORD}"
+            f"@{s.DB_HOST}:{s.DB_PORT}/{s.DB_NAME}"
+        )
+        if s.DATABASE_URL == db_url_from_parts and s.DB_PASSWORD in ("", "nakima", "changeme"):
+            errors.append(
+                "ENVIRONMENT=production but DB_PASSWORD is a default/empty value. "
+                "Set DB_PASSWORD or provide DATABASE_URL directly."
+            )
+        # GITHUB_WEBHOOK_SECRET is only required when the GitHub App is actually
+        # configured.  If GITHUB_APP_ID is not set, there are no webhooks to
+        # authenticate, so requiring the secret would be a false positive that
+        # prevents startup on deployments that haven't registered the App yet.
+        if s.GITHUB_APP_ID and not s.GITHUB_WEBHOOK_SECRET:
+            errors.append(
+                "ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET when "
+                "GITHUB_APP_ID is set."
+            )
 
     if errors:
         raise PreflightError("Configuration preflight failed:\n  - " + "\n  - ".join(errors))
