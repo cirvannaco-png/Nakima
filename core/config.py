@@ -186,10 +186,7 @@ def preflight(s: "Settings | None" = None) -> list[str]:
         # keeps its default value ("nakima") even though the real password is
         # embedded in the URL, so the check would be a false positive that
         # prevents startup.
-        db_url_from_parts = (
-            f"postgresql+asyncpg://{s.DB_USER}:{s.DB_PASSWORD}"
-            f"@{s.DB_HOST}:{s.DB_PORT}/{s.DB_NAME}"
-        )
+        db_url_from_parts = f"postgresql+asyncpg://{s.DB_USER}:{s.DB_PASSWORD}@{s.DB_HOST}:{s.DB_PORT}/{s.DB_NAME}"
         if s.DATABASE_URL == db_url_from_parts and s.DB_PASSWORD in ("", "nakima", "changeme"):
             errors.append(
                 "ENVIRONMENT=production but DB_PASSWORD is a default/empty value. "
@@ -200,10 +197,7 @@ def preflight(s: "Settings | None" = None) -> list[str]:
         # authenticate, so requiring the secret would be a false positive that
         # prevents startup on deployments that haven't registered the App yet.
         if s.GITHUB_APP_ID and not s.GITHUB_WEBHOOK_SECRET:
-            errors.append(
-                "ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET when "
-                "GITHUB_APP_ID is set."
-            )
+            errors.append("ENVIRONMENT=production requires GITHUB_WEBHOOK_SECRET when GITHUB_APP_ID is set.")
 
     if errors:
         raise PreflightError("Configuration preflight failed:\n  - " + "\n  - ".join(errors))

@@ -14,18 +14,18 @@ down_revision = "0002"
 branch_labels = None
 depends_on = None
 
-# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# postgresql.ENUM(create_type=False) prevents SQLAlchemy from auto-issuing CREATE TYPE inside
 # op.create_table(); we control type creation explicitly with checkfirst=True
 # so re-running the migration on a database that already has the type is safe.
-ecosystem = sa.Enum("pypi", "npm", name="ecosystem", create_type=False)
-roadmap_status = sa.Enum("active", "superseded", name="roadmapstatus", create_type=False)
-recommendation_category = sa.Enum(
+ecosystem = postgresql.ENUM("pypi", "npm", name="ecosystem", create_type=False)
+roadmap_status = postgresql.ENUM("active", "superseded", name="roadmapstatus", create_type=False)
+recommendation_category = postgresql.ENUM(
     "dependency", "architecture", "testing", "security", "documentation",
     name="recommendationcategory",
     create_type=False,
 )
-effort_estimate = sa.Enum("small", "medium", "large", name="effortestimate", create_type=False)
-item_status = sa.Enum("proposed", "accepted", "dismissed", "completed", name="itemstatus", create_type=False)
+effort_estimate = postgresql.ENUM("small", "medium", "large", name="effortestimate", create_type=False)
+item_status = postgresql.ENUM("proposed", "accepted", "dismissed", "completed", name="itemstatus", create_type=False)
 
 
 def upgrade() -> None:

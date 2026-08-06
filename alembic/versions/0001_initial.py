@@ -6,16 +6,17 @@ Create Date: 2026-07-15
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0001"
 down_revision = None
 branch_labels = None
 depends_on = None
 
-# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# postgresql.ENUM(create_type=False) prevents SQLAlchemy from auto-issuing CREATE TYPE inside
 # op.create_table(); we control type creation explicitly with checkfirst=True
 # so re-running the migration on a database that already has the type is safe.
-task_status = sa.Enum("pending", "in_progress", "success", "failed", name="taskstatus", create_type=False)
+task_status = postgresql.ENUM("pending", "in_progress", "success", "failed", name="taskstatus", create_type=False)
 
 
 def upgrade() -> None:

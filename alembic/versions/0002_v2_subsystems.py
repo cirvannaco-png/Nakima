@@ -13,15 +13,15 @@ down_revision = "0001"
 branch_labels = None
 depends_on = None
 
-# create_type=False prevents SQLAlchemy from auto-issuing CREATE TYPE inside
+# postgresql.ENUM(create_type=False) prevents SQLAlchemy from auto-issuing CREATE TYPE inside
 # op.create_table(); we control type creation explicitly with checkfirst=True
 # so re-running the migration on a database that already has the type is safe.
-node_type = sa.Enum(
+node_type = postgresql.ENUM(
     "file", "class", "function", "method", "variable", "import", "api_endpoint", "test",
     name="nodetype",
     create_type=False,
 )
-edge_type = sa.Enum(
+edge_type = postgresql.ENUM(
     "imports", "calls", "inherits", "contains", "depends_on", "tests",
     name="edgetype",
     create_type=False,

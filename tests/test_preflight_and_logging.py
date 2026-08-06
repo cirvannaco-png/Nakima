@@ -44,12 +44,17 @@ def test_preflight_rejects_partial_github_app():
         preflight(s)
 
 
-def test_preflight_production_requires_strong_secrets():
+def test_preflight_production_requires_strong_secrets(monkeypatch):
+    # DATABASE_URL must be unset for this check: preflight only validates
+    # DB_PASSWORD when the URL was derived from the individual DB_* parts.
+    # CI exports DATABASE_URL, so clear it to keep the test hermetic.
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     s = Settings(
         ENVIRONMENT="production",
         DEFAULT_AI_PROVIDER="github",
         GITHUB_TOKEN="x",
         DB_PASSWORD="nakima",
+        DATABASE_URL=None,
     )
     with pytest.raises(PreflightError):
         preflight(s)
