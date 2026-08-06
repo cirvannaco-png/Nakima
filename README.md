@@ -78,6 +78,8 @@ GitHub Issue
 | **Engineering reports** | PDF reports with decision registry, event log, and security findings |
 | **Document upload** | Ingest PDF/DOCX context documents for repository-aware Q&A |
 | **Quality Gate** | Blocks PRs when source changes have no accompanying test changes |
+| **Evolution review gate** | Roadmap recommendations stay proposals until a human accepts or dismisses them; accepting can open the GitHub issue |
+| **Token budget compression** | Trims planner context to a token budget, keeping high fan-in files so large repos stay within provider limits |
 | **Virus scanning** | ClamAV integration for uploaded documents |
 | **Command Centre** | Real-time dashboard at `/` |
 
@@ -108,6 +110,67 @@ curl http://localhost:8000/health
 
 The Command Centre dashboard is at `http://localhost:8000/`.
 API docs (Swagger) are at `http://localhost:8000/docs`.
+
+---
+
+## Self-Evolution Review Gate
+
+NEIS analyses a repository and produces an **evolution roadmap** — a ranked list
+of recommendations. Nothing in that roadmap acts on its own: every item starts as
+`proposed` and needs an explicit human decision before it becomes work.
+
+```bash
+# Read the roadmap
+curl http://localhost:8000/api/v1/neis/{owner}%2F{repo}/roadmap
+
+# Accept an item and open a GitHub issue for it
+curl -X PATCH http://localhost:8000/api/v1/neis/{owner}%2F{repo}/roadmap/items/{item_id} \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted", "github_token": "<PAT with repo scope>"}'
+
+# Dismiss an item (never touches GitHub)
+curl -X PATCH http://localhost:8000/api/v1/neis/{owner}%2F{repo}/roadmap/items/{item_id} \
+  -H "Content-Type: application/json" \
+  -d '{"status": "dismissed"}'
+```
+
+Notes:
+
+- `status` accepts only `accepted` or `dismissed`. Anything else is rejected with `422`.
+- `github_token` is optional. Omit it to record the decision without opening an issue.
+- Issue creation is **idempotent** on the item's stored `issue_number`, so retries and
+  double-clicks never open duplicate issues.
+- If GitHub is unreachable, the review decision is still saved; the item keeps
+  `issue_url: null` until a later accept call succeeds.
+- The issue Nakima opens is an ordinary issue, so the existing
+  `POST /github/webhook` → orchestrator path picks it up like any human-filed one.
+
+The `issue_number` / `issue_url` columns arrive in migration
+`0010_neis_roadmap_item_issue_tracking`, so run `alembic upgrade head` after pulling.
+
+---
+
+## Planner Token Compression
+
+`planner/token_compressor.py` sits between `ContextBuilder` and the AI provider and
+keeps a context payload inside a token budget:
+
+- the requirement text is never dropped;
+- code snippets are kept in descending **fan-in** order (files that more of the
+  repository depends on survive first);
+- the dependency subgraph is trimmed to the files that actually survived, so the
+  provider never sees edges pointing at content that isn't in the prompt;
+- the returned payload carries a `compression` report (`snippets_kept`,
+  `snippets_dropped`, `estimated_tokens_used`) for debugging truncated prompts.
+
+```python
+from planner.token_compressor import TokenCompressor
+
+payload = TokenCompressor(max_tokens=8000).compress(context)
+```
+
+It is a pure function over an already-built context dict and is not yet wired into
+`ContextBuilder`'s call site.
 
 ---
 

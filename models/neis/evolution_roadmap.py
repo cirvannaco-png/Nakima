@@ -78,6 +78,14 @@ class EvolutionRoadmapItem(Base):
     effort_estimate: Mapped[EffortEstimate] = mapped_column(Enum(EffortEstimate))
     status: Mapped[ItemStatus] = mapped_column(Enum(ItemStatus), default=ItemStatus.PROPOSED)
 
+    # Set when an ACCEPTED item is turned into a GitHub issue (see
+    # api/v1/endpoints/neis.py:update_roadmap_item_status). Nullable because
+    # most items never leave PROPOSED/DISMISSED. issue_number doubles as the
+    # idempotency check that stops a second accept-call from opening a
+    # duplicate issue for the same item.
+    issue_number: Mapped[int | None] = mapped_column(nullable=True)
+    issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     roadmap: Mapped[EvolutionRoadmap] = relationship(back_populates="items")

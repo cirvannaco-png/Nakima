@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -189,3 +189,22 @@ class NEISIntentResponse(BaseModel):
     constraints: list[str]
     priority_weights: dict[str, float]
     notes: str | None
+
+
+class NEISRoadmapItemStatusRequest(BaseModel):
+    # Deliberately excludes PROPOSED (the only initial state, never a valid
+    # target) and COMPLETED (set by the pipeline once work lands, not by a
+    # reviewer clicking accept/dismiss).
+    status: Literal["accepted", "dismissed"]
+    # Same auth posture as NEISAnalyzeRequest.github_token: a caller-supplied
+    # PAT, not the GitHub App's installation-token flow, because Repository
+    # doesn't store an installation_id to look one up from. Optional —
+    # dismissing needs no GitHub write, and accepting without a token just
+    # records the decision without opening an issue.
+    github_token: str | None = None
+
+
+class NEISRoadmapItemStatusResponse(BaseModel):
+    id: str
+    status: str
+    issue_url: str | None = None

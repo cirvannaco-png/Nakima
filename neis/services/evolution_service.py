@@ -13,12 +13,13 @@ output — so its failure does abort the run.
 """
 
 import logging
+import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models.neis.evolution_roadmap import EvolutionRoadmap, RoadmapStatus
+from models.neis.evolution_roadmap import EvolutionRoadmap, EvolutionRoadmapItem, ItemStatus, RoadmapStatus
 from models.neis.user_intent import UserIntent
 from neis.analyzers.innovation_engine import InnovationReasoningEngine
 from neis.analyzers.pattern_extractor import PatternExtractor
@@ -120,3 +121,43 @@ class EvolutionService:
             .where(EvolutionRoadmap.repository_id == repository_id, EvolutionRoadmap.status == RoadmapStatus.ACTIVE)
         )
         return (await self.session.execute(stmt)).scalars().first()
+
+    async def update_item_status(
+        self, repository_id: int, item_id: uuid.UUID, status: ItemStatus
+    ) -> EvolutionRoadmapItem | None:
+        """Human review gate. EvolutionRoadmapItem.status (PROPOSED/ACCEPTED/
+        DISMISSED/COMPLETED) has existed since 0003_neis.py, but nothing ever
+        wrote to it — every recommendation sat at PROPOSED indefinitely. This
+        is the missing write path, not a new model.
+
+        Joins through EvolutionRoadmap and filters on repository_id so a
+        caller can't move an item belonging to a different repository by
+        guessing a UUID — same posture as _get_repository_or_404 in
+        api/v1/endpoints/neis.py.
+        """
+        stmt = (
+            select(EvolutionRoadmapItem)
+            .join(EvolutionRoadmap)
+            .where(EvolutionRoadmapItem.id == item_id, EvolutionRoadmap.repository_id == repository_id)
+        )
+        item = (await self.session.execute(stmt)).scalars().first()
+        if not item:
+            return None
+
+        item.status = status
+        await self.session.commit()
+        await self.session.refresh(item)
+        return item
+
+    async def attach_issue(self, item: EvolutionRoadmapItem, issue_number: int, issue_url: str) -> EvolutionRoadmapItem:
+        """Records the GitHub issue opened for an ACCEPTED item. Separate
+        call from update_item_status because opening the issue happens
+        in the API layer (it's the only place with the caller's
+        github_token) between the status write and this one — see
+        update_roadmap_item_status in api/v1/endpoints/neis.py.
+        """
+        item.issue_number = issue_number
+        item.issue_url = issue_url
+        await self.session.commit()
+        await self.session.refresh(item)
+        return item

@@ -14,7 +14,11 @@ documentation), which is why this is wired up now while those wait on a
 proper trigger + auth mechanism.
 """
 
+import logging
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
+from github import Github
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +29,18 @@ from api.schemas import (
     NEISIntentResponse,
     NEISRealityResponse,
     NEISRoadmapItemResponse,
+    NEISRoadmapItemStatusRequest,
+    NEISRoadmapItemStatusResponse,
     NEISRoadmapResponse,
 )
 from database.session import get_db
+from models.neis.evolution_roadmap import ItemStatus
 from models.neis.project_reality import ProjectRealityModel
 from models.repository import Repository
 from neis.services.evolution_service import EvolutionService
 from repository.engine import RepositoryEngine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -131,3 +140,61 @@ async def set_intent(repo_full_name: str, req: NEISIntentRequest, db: AsyncSessi
         priority_weights=intent.priority_weights,
         notes=intent.notes,
     )
+
+
+@router.patch("/{repo_full_name:path}/roadmap/items/{item_id}", response_model=NEISRoadmapItemStatusResponse)
+async def update_roadmap_item_status(
+    repo_full_name: str,
+    item_id: uuid.UUID,
+    req: NEISRoadmapItemStatusRequest,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """The human review gate. EvolutionRoadmapItem.status has existed since
+    0003_neis.py but had no write path — every recommendation from
+    POST /analyze sat at PROPOSED forever. This lets a reviewer accept or
+    dismiss one item at a time.
+
+    Accepting with a github_token opens a GitHub issue for the item, which
+    is what actually connects this to orchestrator/workflow.py: creating
+    the issue triggers GitHub's "issues" webhook exactly like a
+    human-authored issue would, and POST /github/webhook already routes
+    that event into WorkflowOrchestrator.handle_webhook_event — nothing new
+    needed on that side. Idempotent on item.issue_number: a second accept
+    call (or a client retry) won't open a duplicate issue.
+
+    Issue creation failing doesn't fail the status update — the review
+    decision (accepted/dismissed) is the primary effect of this call and
+    is worth keeping even if GitHub is unreachable; the item just stays
+    ACCEPTED with issue_url=None until a retry succeeds.
+    """
+    repo = await _get_repository_or_404(db, repo_full_name)
+
+    service = EvolutionService(db)
+    item = await service.update_item_status(repo.id, item_id, ItemStatus(req.status))
+    if not item:
+        raise HTTPException(status_code=404, detail="Roadmap item not found for this repository")
+
+    if item.status == ItemStatus.ACCEPTED and req.github_token and not item.issue_number:
+        try:
+            gh_issue = (
+                Github(req.github_token)
+                .get_repo(repo_full_name)
+                .create_issue(
+                    title=f"[NEIS] {item.title}",
+                    body=(
+                        f"{item.rationale}\n\n"
+                        f"---\n"
+                        f"Category: {item.category.value} · Effort: {item.effort_estimate.value} · "
+                        f"Priority score: {item.priority_score:.2f}\n"
+                        f"Opened from an accepted NEIS roadmap recommendation "
+                        f"(item {item.id})."
+                    ),
+                )
+            )
+            item = await service.attach_issue(item, gh_issue.number, gh_issue.html_url)
+        except Exception as e:
+            # Same posture as githubapp/app.py's GitHubAppAuthError handling:
+            # log with enough detail to debug, don't leak it as a raw 500.
+            logger.warning(f"Failed to open GitHub issue for roadmap item {item.id}: {e}")
+
+    return NEISRoadmapItemStatusResponse(id=str(item.id), status=item.status.value, issue_url=item.issue_url)
