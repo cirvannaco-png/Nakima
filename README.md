@@ -174,6 +174,27 @@ It is a pure function over an already-built context dict and is not yet wired in
 
 ---
 
+## Security Gate Benchmark
+
+The Security Gate is verified by a ground-truth benchmark rather than a quality
+score: `tests/benchmark_security_gates.py` runs the real scanners
+(`SecretScanner`, `ConfigSecurityScanner`, `VirusScanner` with an EICAR-aware
+mocked clamd) through the real decision layer (`RiskScorer`,
+`security_gate_should_block`) against scratch repositories on disk.
+
+Each case has a known right answer, so the required pass rate is 100% — a
+failure is either a threat that stopped blocking or clean input that started
+blocking.
+
+```bash
+pytest tests/benchmark_security_gates.py -v -s
+```
+
+See [BENCHMARK_SECURITY_GATES.md](BENCHMARK_SECURITY_GATES.md) for the case
+corpus, how to add cases, and how to verify the CI-level scanners by hand.
+
+---
+
 ## Documentation
 
 | Guide | Description |
@@ -186,6 +207,7 @@ It is a pure function over an already-built context dict and is not yet wired in
 | [User Guide](docs/USER_GUIDE.md) | Using the GitHub App end-to-end |
 | [Testing Guide](docs/TESTING.md) | Unit, integration, E2E, coverage requirements |
 | [Security Guide](docs/SECURITY.md) | Secrets, auth, NSIL, dependency policy |
+| [Security Gate Benchmark](BENCHMARK_SECURITY_GATES.md) | Ground-truth block/pass corpus for the security gate |
 | [Operations Guide](docs/OPERATIONS.md) | Monitoring, logging, incident response, scaling |
 
 ---
