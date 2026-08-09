@@ -80,6 +80,7 @@ GitHub Issue
 | **Quality Gate** | Blocks PRs when source changes have no accompanying test changes |
 | **Evolution review gate** | Roadmap recommendations stay proposals until a human accepts or dismisses them; accepting can open the GitHub issue |
 | **Market research (optional)** | Research → Judge → Opportunity pipeline turns external signals into proposals; disabled until a search backend is configured, and nothing it produces reaches the roadmap without an explicit promotion call |
+| **Sandbox lab & self-healing** | Ephemeral, network-isolated container reproduces a failure, generates bounded multi-model candidate fixes, validates each against the full suite, and routes the result to human review |
 | **Token budget compression** | Trims planner context to a token budget, keeping high fan-in files so large repos stay within provider limits |
 | **Virus scanning** | ClamAV integration for uploaded documents |
 | **Command Centre** | Real-time dashboard at `/` |
@@ -240,6 +241,44 @@ corpus, how to add cases, and how to verify the CI-level scanners by hand.
 
 ---
 
+## Sandbox Lab & Self-Healing
+
+Where a proposed fix is proven before a human ever sees it. Every run happens in
+an **ephemeral container with `network: none`**, against a read-only clone pinned
+to a single commit — never against the live repository.
+
+- **Orchestrator** (`orchestrator/main.py`) — accepts a run request, checks the
+  repository's lab opt-in, launches the sandbox container, collects exactly one
+  `result.json`, and destroys the container **always** (including on failure and
+  timeout). Concurrency and container TTL are hard-capped.
+- **Sandbox entrypoint** (`sandbox_image/entrypoint.py`) — clones at the commit,
+  records a baseline full-suite run as the control, optionally runs a CVE scan or
+  synthetic injection, then hands off to the healing loop and writes its result.
+- **Self-healing loop** (`orchestrator/self_healing.py`) — diagnose, generate
+  candidate fixes across multiple providers, validate **each candidate against
+  the entire test suite**, and compute (never assert) a confidence score.
+  Bounded by `MAX_HEAL_ATTEMPTS`: on exhaustion it escalates to human review with
+  the full diagnostic trail rather than looping. Failures classified as security
+  findings always route to human review regardless of confidence.
+
+Sandbox results are tenant-isolated rows (`db/schema.sql`) and are surfaced for
+review — nothing is applied to a repository automatically.
+
+Learning from those runs is deliberately offline: an outcome becomes a
+`pattern_memory` candidate with `promoted_to_base_model = false` and only a
+separate, manual batch review flips it. See
+[NEIS Learning Policy](docs/NEIS_LEARNING_POLICY.md).
+
+The lab is **v0.1 and partly stubbed** — clone-URL minting, container log
+polling, and the model wiring in `diagnose_failure` / `generate_candidate_fix`
+are not production paths yet. Every gap is listed in
+[Known Gaps](docs/known-gaps.md); read it before running the lab against a real
+repository.
+
+See [Lab & Sandbox Overview](docs/LAB_OVERVIEW.md) for the full data flow.
+
+---
+
 ## Documentation
 
 | Guide | Description |
@@ -253,6 +292,9 @@ corpus, how to add cases, and how to verify the CI-level scanners by hand.
 | [Testing Guide](docs/TESTING.md) | Unit, integration, E2E, coverage requirements |
 | [Security Guide](docs/SECURITY.md) | Secrets, auth, NSIL, dependency policy |
 | [Security Gate Benchmark](BENCHMARK_SECURITY_GATES.md) | Ground-truth block/pass corpus for the security gate |
+| [Lab & Sandbox Overview](docs/LAB_OVERVIEW.md) | Sandbox isolation model, self-healing data flow, review path |
+| [NEIS Learning Policy](docs/NEIS_LEARNING_POLICY.md) | Why sandbox outcomes never update the shared model live |
+| [Known Gaps](docs/known-gaps.md) | What is real vs. stubbed in the lab / self-healing v0.1 |
 | [Operations Guide](docs/OPERATIONS.md) | Monitoring, logging, incident response, scaling |
 
 ---

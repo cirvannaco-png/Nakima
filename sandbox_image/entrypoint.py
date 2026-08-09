@@ -147,12 +147,14 @@ def main() -> None:
         injected = maybe_inject_synthetic_vulnerability(WORKSPACE) if trigger == "synthetic_injection" else False
 
         if baseline_passed and not cve_findings and not injected:
-            write_result({
-                "run_id": run_id,
-                "status": "no_issue_found",
-                "baseline_passed": True,
-                "duration_seconds": round(time.time() - started_at, 1),
-            })
+            write_result(
+                {
+                    "run_id": run_id,
+                    "status": "no_issue_found",
+                    "baseline_passed": True,
+                    "duration_seconds": round(time.time() - started_at, 1),
+                }
+            )
             return
 
         # This is the ci_log input to the healing loop — for a CI-triggered
@@ -171,32 +173,42 @@ def main() -> None:
             pattern_lookup_fn=pattern_lookup_stub,
         )
 
-        write_result({
-            "run_id": run_id,
-            "status": "healed" if heal_result.success else "escalated",
-            "baseline_passed": baseline_passed,
-            "attempts_used": heal_result.attempts_used,
-            "confidence_score": heal_result.confidence_score,
-            "requires_mandatory_review": heal_result.requires_mandatory_review,
-            "escalation_reason": heal_result.escalation_reason,
-            "selected_diff": heal_result.selected_candidate.diff if heal_result.selected_candidate else None,
-            "diagnosis": {
-                "failure_class": heal_result.final_diagnosis.failure_class.value if heal_result.final_diagnosis else "unknown",
-                "root_cause_summary": heal_result.final_diagnosis.root_cause_summary if heal_result.final_diagnosis else None,
-                "is_security_relevant": heal_result.final_diagnosis.is_security_relevant if heal_result.final_diagnosis else False,
-            },
-            "candidate_count": len(heal_result.all_candidates),
-            "duration_seconds": round(time.time() - started_at, 1),
-        })
+        write_result(
+            {
+                "run_id": run_id,
+                "status": "healed" if heal_result.success else "escalated",
+                "baseline_passed": baseline_passed,
+                "attempts_used": heal_result.attempts_used,
+                "confidence_score": heal_result.confidence_score,
+                "requires_mandatory_review": heal_result.requires_mandatory_review,
+                "escalation_reason": heal_result.escalation_reason,
+                "selected_diff": heal_result.selected_candidate.diff if heal_result.selected_candidate else None,
+                "diagnosis": {
+                    "failure_class": heal_result.final_diagnosis.failure_class.value
+                    if heal_result.final_diagnosis
+                    else "unknown",
+                    "root_cause_summary": heal_result.final_diagnosis.root_cause_summary
+                    if heal_result.final_diagnosis
+                    else None,
+                    "is_security_relevant": heal_result.final_diagnosis.is_security_relevant
+                    if heal_result.final_diagnosis
+                    else False,
+                },
+                "candidate_count": len(heal_result.all_candidates),
+                "duration_seconds": round(time.time() - started_at, 1),
+            }
+        )
 
     except Exception as exc:  # noqa: BLE001 — top-level entrypoint must never crash without a result file
         logger.exception("sandbox run %s failed", run_id)
-        write_result({
-            "run_id": run_id,
-            "status": "failed",
-            "error": str(exc),
-            "duration_seconds": round(time.time() - started_at, 1),
-        })
+        write_result(
+            {
+                "run_id": run_id,
+                "status": "failed",
+                "error": str(exc),
+                "duration_seconds": round(time.time() - started_at, 1),
+            }
+        )
         sys.exit(1)
 
 

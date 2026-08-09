@@ -25,13 +25,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 
 import docker
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from pydantic import BaseModel
 
 logger = logging.getLogger("nakima.lab.orchestrator")
 
@@ -43,7 +42,7 @@ CONTAINER_TTL_SECONDS = 60 * 60 * 2  # hard ceiling; runs must finish or die wit
 MAX_CONCURRENT_RUNS = 4  # matches a single-host budget; revisit only with real concurrency data
 
 
-class RunTrigger(str, Enum):
+class RunTrigger(StrEnum):
     ci_failure = "ci_failure"
     cve_scan = "cve_scan"
     synthetic_injection = "synthetic_injection"
@@ -61,7 +60,7 @@ class SandboxRunRequest(BaseModel):
 class SandboxRunHandle(BaseModel):
     run_id: uuid.UUID
     status: str
-    container_id: Optional[str] = None
+    container_id: str | None = None
 
 
 # In production this is a DB-backed table (sandbox_runs); kept as an
@@ -147,8 +146,8 @@ async def create_sandbox_run(req: SandboxRunRequest, background_tasks: Backgroun
         "status": "provisioning",
         "organization_id": str(req.organization_id),
         "repository_id": str(req.repository_id),
-        "created_at": datetime.now(timezone.utc),
-        "expires_at": datetime.now(timezone.utc) + timedelta(seconds=CONTAINER_TTL_SECONDS),
+        "created_at": datetime.now(UTC),
+        "expires_at": datetime.now(UTC) + timedelta(seconds=CONTAINER_TTL_SECONDS),
     }
 
     background_tasks.add_task(_run_sandbox_lifecycle, run_id, req)
@@ -167,13 +166,15 @@ async def _run_sandbox_lifecycle(run_id: str, req: SandboxRunRequest):
         # Re-verify consent here too, independent of the check in
         # create_sandbox_run — this is the request-handling process's own
         # defense-in-depth layer, not a reuse of the earlier check's result.
-        synthetic_verified = (
-            req.request_synthetic_injection and await _repo_has_lab_consent(req.repository_id)
-        )
+        synthetic_verified = req.request_synthetic_injection and await _repo_has_lab_consent(req.repository_id)
 
         container_id = await asyncio.to_thread(
             _launch_isolated_container,
-            run_id, clone_url, req.source_commit_sha, req.trigger.value, synthetic_verified,
+            run_id,
+            clone_url,
+            req.source_commit_sha,
+            req.trigger.value,
+            synthetic_verified,
         )
         _ACTIVE_RUNS[run_id]["container_id"] = container_id
         _ACTIVE_RUNS[run_id]["status"] = "running"
@@ -183,7 +184,7 @@ async def _run_sandbox_lifecycle(run_id: str, req: SandboxRunRequest):
         _ACTIVE_RUNS[run_id]["status"] = "awaiting_review"
         await _persist_run_result(run_id, req, result)
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("sandbox run %s exceeded TTL, forcing teardown", run_id)
         _ACTIVE_RUNS[run_id]["status"] = "expired"
     except Exception:

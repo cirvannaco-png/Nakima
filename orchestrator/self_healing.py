@@ -43,17 +43,16 @@ from __future__ import annotations
 import logging
 import subprocess
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 logger = logging.getLogger("nakima.neis.self_healing")
 
-MAX_HEAL_ATTEMPTS = 3           # hard ceiling per run; see design principle 1
+MAX_HEAL_ATTEMPTS = 3  # hard ceiling per run; see design principle 1
 MIN_CONFIDENCE_TO_SURFACE = 0.55  # below this, don't even show the user a fix — say "no confident fix found"
 CANDIDATE_MODELS = ["claude", "gpt", "gemini", "deepseek", "kimi"]  # order = fallback priority, not preference ranking
 
 
-class FailureClass(str, Enum):
+class FailureClass(StrEnum):
     ci_test_failure = "ci_test_failure"
     build_failure = "build_failure"
     dependency_conflict = "dependency_conflict"
@@ -76,8 +75,8 @@ class CandidateFix:
     provider: str
     diff: str
     rationale: str
-    full_suite_passed: Optional[bool] = None
-    suite_output_summary: Optional[str] = None
+    full_suite_passed: bool | None = None
+    suite_output_summary: str | None = None
 
 
 @dataclass
@@ -85,11 +84,11 @@ class HealResult:
     success: bool
     attempts_used: int
     final_diagnosis: Diagnosis
-    selected_candidate: Optional[CandidateFix]
+    selected_candidate: CandidateFix | None
     all_candidates: list[CandidateFix] = field(default_factory=list)
     confidence_score: float = 0.0
     requires_mandatory_review: bool = True  # default safe: everything needs review until proven otherwise
-    escalation_reason: Optional[str] = None
+    escalation_reason: str | None = None
 
 
 class TestSuiteRunner:
@@ -198,15 +197,12 @@ def run_self_healing_loop(
     MAX_HEAL_ATTEMPTS, then escalate.
     """
     all_candidates: list[CandidateFix] = []
-    diagnosis: Optional[Diagnosis] = None
+    diagnosis: Diagnosis | None = None
 
     for attempt in range(1, MAX_HEAL_ATTEMPTS + 1):
         diagnosis = diagnose_failure(ci_log, repo_context)
 
-        candidates = [
-            generate_candidate_fix(provider, diagnosis, repo_snapshot_path)
-            for provider in CANDIDATE_MODELS
-        ]
+        candidates = [generate_candidate_fix(provider, diagnosis, repo_snapshot_path) for provider in CANDIDATE_MODELS]
 
         for c in candidates:
             passed, output = suite_runner.run()
@@ -235,7 +231,9 @@ def run_self_healing_loop(
 
         logger.info(
             "heal attempt %s/%s: no candidate cleared confidence threshold (best confidence=%s)",
-            attempt, MAX_HEAL_ATTEMPTS, confidence,
+            attempt,
+            MAX_HEAL_ATTEMPTS,
+            confidence,
         )
 
     # Exhausted attempts without a confident fix — escalate, don't loop forever.
