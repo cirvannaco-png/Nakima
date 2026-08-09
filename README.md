@@ -194,6 +194,21 @@ curl -X POST http://localhost:8000/api/v1/market-research/{owner}%2F{repo}/oppor
 Migration `0011_market_research` adds the `external_signals` and
 `external_opportunities` tables and the `market_opportunity` roadmap category.
 
+To go from a clean database to a first scan in one step, use
+`scripts/market-research-bootstrap.sh` — it runs `alembic upgrade head`,
+indexes the repository (the scan returns 404 on an unindexed repo), then
+fires the scan. It stops there: promotion stays a separate, deliberate call.
+
+```bash
+GITHUB_TOKEN=ghp_xxx scripts/market-research-bootstrap.sh \
+  cirvannaco/Cirvanna \
+  "Cirvanna, AI-powered fashion identity intelligence for the African luxury market" \
+  "AI fashion identity platform competitors"
+```
+
+Set `NAKIMA_API_URL` for a non-local API, and `SKIP_MIGRATE=1` / `SKIP_INDEX=1`
+to skip steps you have already run.
+
 ---
 
 ## Planner Token Compression
