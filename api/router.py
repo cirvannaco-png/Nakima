@@ -24,6 +24,7 @@ verifies code changes across GitHub repositories.
 * `/api/v1/repositories` — register repos and query analysis / health
 * `/api/v1/memory` — knowledge-graph queries and learning feedback
 * `/api/v1/agents` — enumerate agents and capabilities
+* `/api/v1/market-research` — Research/Judge/Opportunity pipeline (external signals, human-gated promotion into the roadmap)
 * `/github/webhook` — GitHub App webhook receiver (HMAC-verified)
 """
 
@@ -32,6 +33,7 @@ OPENAPI_TAGS = [
     {"name": "repositories", "description": "Repository analysis & health."},
     {"name": "memory", "description": "Knowledge graph & learning."},
     {"name": "agents", "description": "Agent registry."},
+    {"name": "market-research", "description": "External research pipeline, gated promotion into the NEIS roadmap."},
     {"name": "health", "description": "Liveness & readiness probes."},
     {"name": "github", "description": "GitHub App webhook."},
 ]

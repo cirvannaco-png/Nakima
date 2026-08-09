@@ -79,6 +79,7 @@ GitHub Issue
 | **Document upload** | Ingest PDF/DOCX context documents for repository-aware Q&A |
 | **Quality Gate** | Blocks PRs when source changes have no accompanying test changes |
 | **Evolution review gate** | Roadmap recommendations stay proposals until a human accepts or dismisses them; accepting can open the GitHub issue |
+| **Market research (optional)** | Research → Judge → Opportunity pipeline turns external signals into proposals; disabled until a search backend is configured, and nothing it produces reaches the roadmap without an explicit promotion call |
 | **Token budget compression** | Trims planner context to a token budget, keeping high fan-in files so large repos stay within provider limits |
 | **Virus scanning** | ClamAV integration for uploaded documents |
 | **Command Centre** | Real-time dashboard at `/` |
@@ -147,6 +148,50 @@ Notes:
 
 The `issue_number` / `issue_url` columns arrive in migration
 `0010_neis_roadmap_item_issue_tracking`, so run `alembic upgrade head` after pulling.
+
+---
+
+## Market Research Pipeline
+
+A separate, optional pipeline for external signal — competitor moves, framework
+changes, UX trends — that the roadmap above has no way to see, since NEIS's
+recommendations are deliberately limited to facts it can measure about the
+repository itself (see `neis/analyzers/innovation_engine.py`). Three stages:
+
+- **Research Agent** (`market_research/research_scout.py`) — runs your queries
+  against a configurable search backend and stores each hit as an
+  `ExternalSignal`. No backend is chosen out of the box; set
+  `MARKET_RESEARCH_SEARCH_API_KEY` (see `.env.example`) once you've picked one.
+  Until then, scans run and report zero signals rather than failing.
+- **Judge Agent** (`market_research/judge.py`) — screens every pending signal
+  for relevance and credibility before anything downstream sees it.
+  **Fail-closed**: no AI provider configured, or a response that doesn't parse,
+  is rejected, never silently accepted.
+- **Opportunity Engine** (`market_research/opportunity_engine.py`) — turns
+  only the accepted signals into `ExternalOpportunity` proposals, each with
+  the provider's own (self-reported, unverified) confidence score.
+
+Opportunities never reach the roadmap or the Coding Agent on their own. A
+human has to explicitly promote one — at that point it becomes an ordinary
+`EvolutionRoadmapItem` (category `market_opportunity`) and goes through the
+same accept/dismiss gate as everything else above.
+
+```bash
+# Run a scan
+curl -X POST http://localhost:8000/api/v1/market-research/{owner}%2F{repo}/scan \
+  -H "Content-Type: application/json" \
+  -d '{"queries": ["abandoned cart recovery competitors"], "repo_context": "..."}'
+
+# Review what it found
+curl http://localhost:8000/api/v1/market-research/{owner}%2F{repo}/opportunities
+
+# Promote one into the roadmap, or dismiss it
+curl -X POST http://localhost:8000/api/v1/market-research/{owner}%2F{repo}/opportunities/{id}/promote
+curl -X POST http://localhost:8000/api/v1/market-research/{owner}%2F{repo}/opportunities/{id}/dismiss
+```
+
+Migration `0011_market_research` adds the `external_signals` and
+`external_opportunities` tables and the `market_opportunity` roadmap category.
 
 ---
 

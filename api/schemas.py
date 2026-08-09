@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RepositoryIndexRequest(BaseModel):
@@ -208,3 +208,51 @@ class NEISRoadmapItemStatusResponse(BaseModel):
     id: str
     status: str
     issue_url: str | None = None
+
+
+# --- Market Research (market_research/) -------------------------------------
+
+
+class MarketResearchScanRequest(BaseModel):
+    # Caller-supplied research topics, not inferred from the repo — see
+    # research_scout.py's docstring for why. At least one required.
+    queries: list[str] = Field(min_length=1, max_length=10)
+    # Free-text description of the product/repo, given to the Judge and
+    # Opportunity Engine as context for relevance judgments — e.g. "Cirvanna,
+    # an AI fashion identity platform for the African luxury market."
+    repo_context: str = Field(min_length=1, max_length=2000)
+
+
+class MarketResearchScanResponse(BaseModel):
+    signals_collected: int
+    signals_judged: int
+    signals_accepted: int
+    opportunities_generated: int
+    stages_completed: list[str]
+    stages_failed: dict[str, str]
+
+
+class ExternalSignalResponse(BaseModel):
+    id: str
+    query: str
+    title: str
+    url: str
+    snippet: str
+    judge_verdict: str
+    judge_rationale: str | None
+
+
+class ExternalOpportunityResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+    confidence: float
+    status: str
+    source_signal_ids: list[str]
+    created_at: str
+
+
+class OpportunityPromoteResponse(BaseModel):
+    opportunity_id: str
+    roadmap_item_id: str
+    roadmap_item_status: str

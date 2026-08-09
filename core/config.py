@@ -89,6 +89,22 @@ class Settings(BaseSettings):
     CLAMD_PORT: int = 3310
     CLAMD_TIMEOUT_SECONDS: float = 15.0
 
+    # Market Research (market_research/) — Research Agent's external signal
+    # scan. Same graceful-degradation posture as NEIS_HTTP_* above: no key
+    # means the scan stage reports zero signals and logs why, rather than
+    # failing the run. No backend is chosen yet — market_research/search.py
+    # ships BraveSearchClient as a reference implementation, but you can
+    # point this at whatever backend you settle on; nothing else in the
+    # module depends on it being Brave.
+    MARKET_RESEARCH_SEARCH_API_KEY: str | None = None
+    MARKET_RESEARCH_HTTP_TIMEOUT: float = 8.0
+    MARKET_RESEARCH_MAX_RESULTS_PER_QUERY: int = 8
+    # Ceiling on ExternalSignal rows judged ACCEPTED per scan that the
+    # Opportunity Engine will actually spend a provider call on — an
+    # unbounded scan (many queries * many results) could otherwise turn
+    # one /scan call into dozens of LLM calls.
+    MARKET_RESEARCH_MAX_OPPORTUNITIES_PER_RUN: int = 5
+
     # Logging: "json" (default, structured) or "text" (human-readable dev logs).
     LOG_FORMAT: str = "json"
 

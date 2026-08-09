@@ -19,6 +19,11 @@ async def db_session():
     from models.intelligence.decision import EngineeringDecision, EngineeringEvent  # noqa: F401
     from models.knowledge import KnowledgeEdge, KnowledgeNode  # noqa: F401
     from models.neis.evolution_roadmap import EvolutionRoadmap, EvolutionRoadmapItem  # noqa: F401
+    from models.neis.external_opportunity import (  # noqa: F401
+        ExternalOpportunity,
+        ExternalOpportunitySignal,
+        ExternalSignal,
+    )
     from models.neis.project_reality import ProjectRealityModel  # noqa: F401
     from models.neis.technology_intel import TechnologyIntel  # noqa: F401
     from models.neis.user_intent import UserIntent  # noqa: F401

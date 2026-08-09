@@ -19,6 +19,13 @@ class RecommendationCategory(enum.StrEnum):
     TESTING = "testing"
     SECURITY = "security"
     DOCUMENTATION = "documentation"
+    # Added for market_research/promotion.py. Every other category traces to
+    # a measured fact about this repository (see innovation_engine.py's
+    # module docstring); this is the one exception, and it can only reach
+    # this table via an explicit human promotion of an ExternalOpportunity
+    # — see models/neis/external_opportunity.py for why that's a separate
+    # table with its own status machine rather than a shortcut into this one.
+    MARKET_OPPORTUNITY = "market_opportunity"
 
 
 class EffortEstimate(enum.StrEnum):
