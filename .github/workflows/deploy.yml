@@ -1,6 +1,8 @@
 name: Deploy
 
 # Runs only after CI succeeds on main, so a broken build can never ship.
+# A failed post-deploy health check automatically rolls production back to the
+# previous known-good container image.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -16,13 +18,16 @@ concurrency:
   group: deploy-main
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
   image:
     name: Publish container image (GHCR)
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      previous: ${{ steps.previous.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +42,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Captured before the new push so the rollback job knows what "last
+      # known-good" means.
+      - name: Record current production digest
+        id: previous
+        run: |
+          digest=$(docker buildx imagetools inspect "$IMAGE:latest" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          if [ -n "$digest" ]; then
+            echo "::notice::Previous production image $digest recorded for rollback."
+          else
+            echo "::notice::No previous production image found - rollback will be skipped."
+          fi
 
       - name: Image metadata
         id: meta
@@ -96,4 +114,56 @@ jobs:
             sleep 10
           done
           echo "::error::Production health check did not pass within 5 minutes."
+          exit 1
+
+  rollback:
+    name: Rollback production
+    needs: [image, render]
+    if: failure() && needs.image.outputs.previous != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Re-point :latest at the last known-good image
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:latest" \
+            "$IMAGE@${{ needs.image.outputs.previous }}"
+          echo "::warning::Production rolled back to ${{ needs.image.outputs.previous }}."
+
+      - name: Check deploy hook
+        id: hook
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Redeploy previous image
+        if: steps.hook.outputs.configured == 'true'
+        run: |
+          curl -sS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" -o /tmp/rollback.out -w '%{http_code}\n'
+          cat /tmp/rollback.out
+
+      - name: Verify rollback health
+        if: steps.hook.outputs.configured == 'true' && vars.PRODUCTION_URL != ''
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.PRODUCTION_URL }}/health" > /dev/null; then
+              echo "Production healthy again after rollback."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Production is still unhealthy after rollback - manual intervention required."
           exit 1

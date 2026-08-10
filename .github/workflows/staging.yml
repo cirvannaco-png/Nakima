@@ -1,0 +1,166 @@
+name: Staging
+
+# Staging pipeline: every push to `develop` that passes CI is built, published
+# as a `staging` image and deployed to the staging environment. A failed health
+# check rolls the staging service back to the previous known-good image.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  image:
+    name: Publish staging image (GHCR)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      previous: ${{ steps.previous.outputs.digest }}
+      sha: ${{ steps.sha.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve commit sha
+        id: sha
+        run: echo "value=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Recorded before the new push so a failed deploy can be rolled back to it.
+      - name: Record current staging digest
+        id: previous
+        run: |
+          digest=$(docker buildx imagetools inspect "$IMAGE:staging" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          if [ -n "$digest" ]; then
+            echo "::notice::Previous staging image $digest recorded for rollback."
+          else
+            echo "::notice::No previous staging image found - rollback will be skipped."
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push staging image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:staging
+            ${{ env.IMAGE }}:staging-${{ steps.sha.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to staging
+    needs: image
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      healthy: ${{ steps.health.outcome == 'success' }}
+    steps:
+      - name: Check deploy hook
+        id: hook
+        run: |
+          if [ -n "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RENDER_STAGING_DEPLOY_HOOK_URL is not set - skipping hosted staging deploy."
+          fi
+
+      - name: Deploy
+        if: steps.hook.outputs.configured == 'true'
+        run: |
+          code=$(curl -sS -o /tmp/deploy.out -w '%{http_code}' -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}")
+          cat /tmp/deploy.out
+          if [ "$code" -ge 400 ]; then
+            echo "::error::Staging deploy hook failed with HTTP $code"
+            exit 1
+          fi
+
+      - name: Wait for health check
+        id: health
+        if: steps.hook.outputs.configured == 'true' && vars.STAGING_URL != ''
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.STAGING_URL }}/health" > /dev/null; then
+              echo "Staging health check passed."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Staging health check did not pass within 5 minutes."
+          exit 1
+
+  rollback:
+    name: Rollback staging
+    needs: [image, deploy]
+    if: failure() && needs.image.outputs.previous != ''
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Re-point :staging at the last known-good image
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:staging" \
+            "$IMAGE@${{ needs.image.outputs.previous }}"
+          echo "::warning::Staging rolled back to ${{ needs.image.outputs.previous }}."
+
+      - name: Check deploy hook
+        id: hook
+        run: |
+          if [ -n "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Redeploy previous image
+        if: steps.hook.outputs.configured == 'true'
+        run: |
+          curl -sS -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}" -o /tmp/rollback.out -w '%{http_code}\n'
+          cat /tmp/rollback.out
+
+      - name: Verify rollback health
+        if: steps.hook.outputs.configured == 'true' && vars.STAGING_URL != ''
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.STAGING_URL }}/health" > /dev/null; then
+              echo "Staging healthy again after rollback."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Staging is still unhealthy after rollback - manual intervention required."
+          exit 1
