@@ -18,7 +18,7 @@ touching this file.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .adapter import DeployAdapter
 from .models import (
@@ -26,7 +26,6 @@ from .models import (
     DeployPlan,
     DeployRun,
     DeployStatus,
-    DeployStatusState,
     RiskLevel,
     RollbackResult,
     ValidationResult,
@@ -83,9 +82,7 @@ class DeployAgent:
     def _get_adapter(self, platform: str, credential_label: str = "default") -> DeployAdapter:
         adapter_cls = self._adapters.get(platform)
         if adapter_cls is None:
-            raise UnknownPlatformError(
-                f"No adapter registered for '{platform}'. Registered: {list(self._adapters)}"
-            )
+            raise UnknownPlatformError(f"No adapter registered for '{platform}'. Registered: {list(self._adapters)}")
         creds = self._secrets.get(platform, credential_label)
         return adapter_cls(credentials=creds)
 
@@ -105,7 +102,10 @@ class DeployAgent:
         plan = adapter.plan(config)
         logger.info(
             "Plan ready: platform=%s risk=%s destructive=%s reversible=%s",
-            plan.platform, plan.risk.value, plan.destructive, plan.reversible,
+            plan.platform,
+            plan.risk.value,
+            plan.destructive,
+            plan.reversible,
         )
 
         approved = self._should_auto_approve(plan) or self._approve(plan)
@@ -120,11 +120,7 @@ class DeployAgent:
         return status
 
     def _should_auto_approve(self, plan: DeployPlan) -> bool:
-        return (
-            self._auto_approve_low_risk
-            and plan.risk == RiskLevel.LOW
-            and not plan.destructive
-        )
+        return self._auto_approve_low_risk and plan.risk == RiskLevel.LOW and not plan.destructive
 
     def poll(self, platform: str, run: DeployRun, credential_label: str = "default") -> DeployStatus:
         adapter = self._get_adapter(platform, credential_label)

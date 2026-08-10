@@ -6,6 +6,13 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: code-quality-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quality:
     name: Lint & Format
@@ -19,8 +26,11 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      # Install the same pinned ruff/flake8 the CI workflow uses so the two
+      # pipelines can never disagree about what "clean" means.
       - name: Install tools
-        run: pip install ruff==0.9.10 flake8==7.2.0
+        run: |
+          pip install "$(grep -E '^ruff==' requirements-dev.txt)" "$(grep -E '^flake8==' requirements-dev.txt)"
 
       - name: Check formatting (ruff)
         run: ruff format --check .

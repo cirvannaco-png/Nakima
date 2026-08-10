@@ -27,8 +27,14 @@ import logging
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.gce")
@@ -44,13 +50,13 @@ class GCEAdapter(DeployAdapter):
             from google.oauth2 import service_account
         except ImportError as exc:
             raise RuntimeError(
-                "The GCE adapter requires the optional 'google-cloud-compute' and "
-                "'google-auth' packages."
+                "The GCE adapter requires the optional 'google-cloud-compute' and 'google-auth' packages."
             ) from exc
         return compute_v1, service_account
 
     def _credentials(self):
         import json
+
         _, service_account = self._sdk()
         sa_info = json.loads(self.credentials["service_account_json"])
         return service_account.Credentials.from_service_account_info(sa_info)
@@ -63,14 +69,10 @@ class GCEAdapter(DeployAdapter):
         if not config.project_ref:
             errors.append("project_ref (instance name) is required.")
         if not config.extra.get("instance_template"):
-            errors.append(
-                "config.extra['instance_template'] (full resource URL of the source template) is required."
-            )
+            errors.append("config.extra['instance_template'] (full resource URL of the source template) is required.")
         strategy = config.extra.get("strategy", "replace")
         if strategy == "in_place":
-            warnings.append(
-                "strategy='in_place' mutates the live instance directly — no automatic rollback path."
-            )
+            warnings.append("strategy='in_place' mutates the live instance directly — no automatic rollback path.")
         if errors:
             return ValidationResult(ok=False, errors=errors, warnings=warnings)
 
@@ -95,11 +97,11 @@ class GCEAdapter(DeployAdapter):
         return DeployPlan(
             platform=self.platform,
             summary=f"{'In-place update' if in_place else 'Create-and-swap'} for GCE instance "
-                    f"'{config.project_ref}' in {self.credentials.get('zone')}",
+            f"'{config.project_ref}' in {self.credentials.get('zone')}",
             changes=(
                 [f"Mutate running instance {config.project_ref} directly"]
-                if in_place else
-                [
+                if in_place
+                else [
                     f"Create new instance from template {config.extra.get('instance_template')}",
                     f"New instance name: {config.project_ref}-{{timestamp}}",
                     "Caller must repoint load balancer/DNS and decommission the old instance "
@@ -115,6 +117,7 @@ class GCEAdapter(DeployAdapter):
 
     def execute(self, config: DeployConfig, plan: DeployPlan) -> DeployRun:
         import time
+
         compute_v1, _ = self._sdk()
         project_id = self.credentials["project_id"]
         zone = self.credentials["zone"]
@@ -136,16 +139,14 @@ class GCEAdapter(DeployAdapter):
             platform=self.platform,
             external_id=new_instance_name,
             logs_url=f"https://console.cloud.google.com/compute/instancesDetail/zones/{zone}"
-                     f"/instances/{new_instance_name}?project={project_id}",
+            f"/instances/{new_instance_name}?project={project_id}",
             metadata={"zone": zone, "project_id": project_id, "old_instance": config.project_ref},
         )
 
     def status(self, run: DeployRun) -> DeployStatus:
         compute_v1, _ = self._sdk()
         client = compute_v1.InstancesClient(credentials=self._credentials())
-        instance = client.get(
-            project=run.metadata["project_id"], zone=run.metadata["zone"], instance=run.external_id
-        )
+        instance = client.get(project=run.metadata["project_id"], zone=run.metadata["zone"], instance=run.external_id)
         state_map = {
             "PROVISIONING": DeployStatusState.EXECUTING,
             "STAGING": DeployStatusState.EXECUTING,
@@ -166,6 +167,6 @@ class GCEAdapter(DeployAdapter):
         return RollbackResult(
             ok=False,
             message=f"Rollback means repointing traffic back to '{old_instance}' and deleting "
-                    f"'{run.external_id}' — only safe if '{old_instance}' hasn't already been "
-                    f"decommissioned. Verify manually before deleting the new instance.",
+            f"'{run.external_id}' — only safe if '{old_instance}' hasn't already been "
+            f"decommissioned. Verify manually before deleting the new instance.",
         )

@@ -7,21 +7,22 @@ unavailable, so it doesn't break CI runs without internet access.
 """
 
 import os
-import shutil
 import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from deploy_agent.sources.github_source import GitHubRepoSource, GitCommandError
+from deploy_agent.sources.github_source import GitCommandError, GitHubRepoSource  # noqa: E402
 
 
 def _network_available() -> bool:
     import subprocess
+
     result = subprocess.run(
         ["git", "ls-remote", "https://github.com/octocat/Hello-World.git", "HEAD"],
-        capture_output=True, timeout=15,
+        capture_output=True,
+        timeout=15,
     )
     return result.returncode == 0
 

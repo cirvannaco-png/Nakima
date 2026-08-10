@@ -44,12 +44,16 @@ def main():
     print("=== Fetching real artifact from GitHub ===")
     source = GitHubRepoSource()  # set GITHUB_TOKEN env var for private repos / higher rate limit
     fetch_result = source.fetch_artifact(owner="octocat", repo="Hello-World", ref="master")
-    print(f"Cloned {fetch_result.owner}/{fetch_result.repo}@{fetch_result.ref} "
-          f"-> {fetch_result.local_path} (commit {fetch_result.resolved_sha[:12]})")
+    print(
+        f"Cloned {fetch_result.owner}/{fetch_result.repo}@{fetch_result.ref} "
+        f"-> {fetch_result.local_path} (commit {fetch_result.resolved_sha[:12]})"
+    )
 
     # --- Part 2: secrets + agent construction ---
     import os
+
     from cryptography.fernet import Fernet
+
     os.environ.setdefault("NAKIMA_DEPLOY_SECRETS_KEY", Fernet.generate_key().decode())
 
     store = SecretsStore(backend=InMemorySecretsBackend())
@@ -70,7 +74,7 @@ def main():
     netlify_config = DeployConfig(
         platform="netlify",
         project_ref="your-real-site-id",
-        artifact_path=fetch_result.local_path,   # <-- the actual cloned repo, not a hardcoded path
+        artifact_path=fetch_result.local_path,  # <-- the actual cloned repo, not a hardcoded path
         environment="production",
         roadmap_item_id="roadmap-042",
     )

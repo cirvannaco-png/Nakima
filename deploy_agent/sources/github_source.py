@@ -30,7 +30,6 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from typing import Optional
 
 import requests
 
@@ -61,7 +60,7 @@ class FetchResult:
 
 
 class GitHubRepoSource:
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: str | None = None):
         """`token`: a GitHub PAT (or GitHub App installation token) with repo
         access. Required for private repos; optional for public ones."""
         self._token = token or os.environ.get("GITHUB_TOKEN")
@@ -75,9 +74,7 @@ class GitHubRepoSource:
         """
         return f"https://github.com/{owner}/{repo}.git"
 
-    def fetch_artifact(
-        self, owner: str, repo: str, ref: str = "main", dest_dir: Optional[str] = None
-    ) -> FetchResult:
+    def fetch_artifact(self, owner: str, repo: str, ref: str = "main", dest_dir: str | None = None) -> FetchResult:
         """Shallow-clone the repo at `ref` into `dest_dir` (a fresh temp dir
         if not given). Returns the local path plus the resolved commit SHA —
         this is what makes the resulting deploy traceable back to an exact
@@ -102,8 +99,7 @@ class GitHubRepoSource:
         except Exception:
             shutil.rmtree(dest_dir, ignore_errors=True)
             raise
-        logger.info("Cloned %s/%s@%s -> %s (%d entries)",
-                    owner, repo, ref, sha[:12], len(os.listdir(dest_dir)))
+        logger.info("Cloned %s/%s@%s -> %s (%d entries)", owner, repo, ref, sha[:12], len(os.listdir(dest_dir)))
         return FetchResult(local_path=dest_dir, resolved_sha=sha, owner=owner, repo=repo, ref=ref)
 
     def _resolve_local_sha(self, repo_path: str) -> str:

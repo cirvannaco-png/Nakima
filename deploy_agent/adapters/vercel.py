@@ -30,8 +30,14 @@ import requests
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.vercel")
@@ -61,7 +67,9 @@ class VercelAdapter(DeployAdapter):
 
         resp = requests.get(
             f"{self.BASE_URL}/v9/projects/{config.project_ref}",
-            headers=self._headers(), params=self._team_params(), timeout=15,
+            headers=self._headers(),
+            params=self._team_params(),
+            timeout=15,
         )
         if resp.status_code == 404:
             return ValidationResult(ok=False, errors=[f"Vercel project not found: {config.project_ref}"])
@@ -75,8 +83,7 @@ class VercelAdapter(DeployAdapter):
         file_count = sum(len(files) for _, _, files in os.walk(config.artifact_path))
         return DeployPlan(
             platform=self.platform,
-            summary=f"Deploy {file_count} files to Vercel project '{config.project_ref}' "
-                    f"({config.environment})",
+            summary=f"Deploy {file_count} files to Vercel project '{config.project_ref}' ({config.environment})",
             changes=[
                 f"Upload {file_count} files by content hash",
                 f"Create new deployment on project {config.project_ref}",
@@ -99,7 +106,10 @@ class VercelAdapter(DeployAdapter):
         }
         resp = requests.post(
             f"{self.BASE_URL}/v13/deployments",
-            headers=self._headers(), params=self._team_params(), json=payload, timeout=60,
+            headers=self._headers(),
+            params=self._team_params(),
+            json=payload,
+            timeout=60,
         )
         resp.raise_for_status()
         deployment = resp.json()
@@ -116,7 +126,9 @@ class VercelAdapter(DeployAdapter):
     def status(self, run: DeployRun) -> DeployStatus:
         resp = requests.get(
             f"{self.BASE_URL}/v13/deployments/{run.external_id}",
-            headers=self._headers(), params=self._team_params(), timeout=15,
+            headers=self._headers(),
+            params=self._team_params(),
+            timeout=15,
         )
         resp.raise_for_status()
         deployment = resp.json()
@@ -144,12 +156,14 @@ class VercelAdapter(DeployAdapter):
             return RollbackResult(
                 ok=False,
                 message="Rollback needs run.metadata['rollback_to_deployment_id'] and ['alias'] set — "
-                        "list prior deployments via GET /v6/deployments to find one.",
+                "list prior deployments via GET /v6/deployments to find one.",
             )
         resp = requests.post(
             f"{self.BASE_URL}/v2/aliases",
-            headers=self._headers(), params=self._team_params(),
-            json={"alias": alias, "deploymentId": previous_deployment_id}, timeout=30,
+            headers=self._headers(),
+            params=self._team_params(),
+            json={"alias": alias, "deploymentId": previous_deployment_id},
+            timeout=30,
         )
         if resp.status_code >= 400:
             return RollbackResult(ok=False, message=f"Alias reassignment failed: {resp.status_code} {resp.text[:200]}")
@@ -167,12 +181,14 @@ class VercelAdapter(DeployAdapter):
                 rel_path = os.path.relpath(filepath, directory)
                 with open(filepath, "rb") as f:
                     content = f.read()
-                digest = hashlib.sha1(content).hexdigest()
+                digest = hashlib.sha1(content, usedforsecurity=False).hexdigest()
 
                 resp = requests.put(
                     f"{self.BASE_URL}/v2/files",
                     headers={**self._headers(), "x-vercel-digest": digest},
-                    params=self._team_params(), data=content, timeout=60,
+                    params=self._team_params(),
+                    data=content,
+                    timeout=60,
                 )
                 resp.raise_for_status()
 

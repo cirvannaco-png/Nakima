@@ -27,8 +27,14 @@ import requests
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.supabase")
@@ -56,15 +62,11 @@ class SupabaseAdapter(DeployAdapter):
         if not config.artifact_path or not os.path.isfile(config.artifact_path):
             errors.append(f"artifact_path must be an existing file, got: {config.artifact_path!r}")
         if target == "migration" and not config.extra.get("down_migration_path"):
-            warnings.append(
-                "No down_migration_path provided — this migration will be marked non-reversible."
-            )
+            warnings.append("No down_migration_path provided — this migration will be marked non-reversible.")
         if errors:
             return ValidationResult(ok=False, errors=errors, warnings=warnings)
 
-        resp = requests.get(
-            f"{self.BASE_URL}/projects/{config.project_ref}", headers=self._headers(), timeout=15
-        )
+        resp = requests.get(f"{self.BASE_URL}/projects/{config.project_ref}", headers=self._headers(), timeout=15)
         if resp.status_code == 404:
             errors.append(f"Supabase project not found: {config.project_ref}")
         elif resp.status_code == 401:
@@ -81,8 +83,7 @@ class SupabaseAdapter(DeployAdapter):
                 sql_preview = f.read(300)
             return DeployPlan(
                 platform=self.platform,
-                summary=f"Apply migration {config.artifact_path} to Supabase project "
-                        f"'{config.project_ref}'",
+                summary=f"Apply migration {config.artifact_path} to Supabase project '{config.project_ref}'",
                 changes=[
                     f"Run SQL against live Postgres DB (preview): {sql_preview}...",
                     "No dry-run available from the Management API — this executes directly.",
@@ -115,7 +116,8 @@ class SupabaseAdapter(DeployAdapter):
             resp.raise_for_status()
             logger.info("Supabase migration applied to project %s", config.project_ref)
             return DeployRun(
-                plan_id=plan.id, platform=self.platform,
+                plan_id=plan.id,
+                platform=self.platform,
                 external_id=f"migration-{config.project_ref}",
                 metadata={"target": "migration", "project_ref": config.project_ref},
             )
@@ -130,7 +132,8 @@ class SupabaseAdapter(DeployAdapter):
         resp.raise_for_status()
         logger.info("Supabase edge function '%s' deployed", function_name)
         return DeployRun(
-            plan_id=plan.id, platform=self.platform,
+            plan_id=plan.id,
+            platform=self.platform,
             external_id=function_name,
             metadata={"target": "edge_function", "project_ref": config.project_ref},
         )
@@ -144,7 +147,8 @@ class SupabaseAdapter(DeployAdapter):
         project_ref = run.metadata.get("project_ref")
         resp = requests.get(
             f"{self.BASE_URL}/projects/{project_ref}/functions/{run.external_id}",
-            headers=self._headers(), timeout=15,
+            headers=self._headers(),
+            timeout=15,
         )
         resp.raise_for_status()
         fn = resp.json()
@@ -160,13 +164,13 @@ class SupabaseAdapter(DeployAdapter):
             return RollbackResult(
                 ok=False,
                 message="Migration rollback is not automated by design — apply the "
-                        "down_migration_path SQL supplied at plan time manually, after "
-                        "confirming the current DB state matches expectations.",
+                "down_migration_path SQL supplied at plan time manually, after "
+                "confirming the current DB state matches expectations.",
             )
         # Edge functions: redeploying a prior version means re-running execute()
         # with that version's artifact — the API has no separate "revert" call.
         return RollbackResult(
             ok=False,
             message="Supabase has no function-revert endpoint — redeploy the previous "
-                    "artifact via execute() with the prior version's file.",
+            "artifact via execute() with the prior version's file.",
         )

@@ -1,15 +1,15 @@
 import hashlib
 import os
+import sys
 import tempfile
 
 import pytest
 import requests_mock
 
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from deploy_agent.adapters.vercel import VercelAdapter
-from deploy_agent.models import DeployConfig, DeployRun, DeployStatusState
+from deploy_agent.adapters.vercel import VercelAdapter  # noqa: E402
+from deploy_agent.models import DeployConfig, DeployRun, DeployStatusState  # noqa: E402
 
 
 @pytest.fixture
@@ -36,13 +36,17 @@ def test_upload_files_computes_real_sha1(artifact_dir):
     put_calls = []
 
     with requests_mock.Mocker() as m:
+
         def record_put(request, context):
-            put_calls.append({
-                "digest_header": request.headers.get("x-vercel-digest"),
-                "body": request.body,
-            })
+            put_calls.append(
+                {
+                    "digest_header": request.headers.get("x-vercel-digest"),
+                    "body": request.body,
+                }
+            )
             context.status_code = 200
             return {}
+
         m.put("https://api.vercel.com/v2/files", json=record_put)
 
         manifest = adapter._upload_files(artifact_dir)
@@ -52,7 +56,7 @@ def test_upload_files_computes_real_sha1(artifact_dir):
 
     # Verify the digest sent in the header actually matches sha1 of the body sent
     for call in put_calls:
-        expected_sha = hashlib.sha1(call["body"]).hexdigest()
+        expected_sha = hashlib.sha1(call["body"], usedforsecurity=False).hexdigest()
         assert call["digest_header"] == expected_sha
 
     manifest_files = {m["file"] for m in manifest}

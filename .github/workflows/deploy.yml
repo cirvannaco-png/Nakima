@@ -1,0 +1,99 @@
+name: Deploy
+
+# Runs only after CI succeeds on main, so a broken build can never ship.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  image:
+    name: Publish container image (GHCR)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  render:
+    name: Trigger Render deploy
+    needs: image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      # No-op (not a failure) until RENDER_DEPLOY_HOOK_URL is configured in the
+      # repository's "production" environment secrets.
+      - name: Check deploy hook
+        id: hook
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RENDER_DEPLOY_HOOK_URL is not set - skipping hosted deploy."
+          fi
+
+      - name: Deploy to Render
+        if: steps.hook.outputs.configured == 'true'
+        run: |
+          code=$(curl -sS -o /tmp/render.out -w '%{http_code}' -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          cat /tmp/render.out
+          if [ "$code" -ge 400 ]; then
+            echo "::error::Render deploy hook failed with HTTP $code"
+            exit 1
+          fi
+
+      - name: Wait for health check
+        if: steps.hook.outputs.configured == 'true' && vars.PRODUCTION_URL != ''
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.PRODUCTION_URL }}/health" > /dev/null; then
+              echo "Production health check passed."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Production health check did not pass within 5 minutes."
+          exit 1

@@ -23,8 +23,14 @@ import requests
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.netlify")
@@ -52,9 +58,7 @@ class NetlifyAdapter(DeployAdapter):
             return ValidationResult(ok=False, errors=errors)
 
         # Confirm the site actually exists and this token can see it.
-        resp = requests.get(
-            f"{self.BASE_URL}/sites/{config.project_ref}", headers=self._headers(), timeout=15
-        )
+        resp = requests.get(f"{self.BASE_URL}/sites/{config.project_ref}", headers=self._headers(), timeout=15)
         if resp.status_code == 404:
             return ValidationResult(ok=False, errors=[f"Netlify site not found: {config.project_ref}"])
         if resp.status_code == 401:
@@ -67,7 +71,7 @@ class NetlifyAdapter(DeployAdapter):
         return DeployPlan(
             platform=self.platform,
             summary=f"Zip and deploy {file_count} files from {config.artifact_path} "
-                    f"to Netlify site '{config.project_ref}'",
+            f"to Netlify site '{config.project_ref}'",
             changes=[f"Create new deploy on site {config.project_ref} ({file_count} files)"],
             risk=RiskLevel.LOW,
             destructive=False,
@@ -124,11 +128,12 @@ class NetlifyAdapter(DeployAdapter):
             return RollbackResult(
                 ok=False,
                 message="No restore_to_deploy_id in run.metadata — list prior deploys via "
-                        "GET /sites/{site_id}/deploys and pick one to restore to.",
+                "GET /sites/{site_id}/deploys and pick one to restore to.",
             )
         resp = requests.post(
             f"{self.BASE_URL}/sites/{site_id}/deploys/{restore_target}/restore",
-            headers=self._headers(), timeout=30,
+            headers=self._headers(),
+            timeout=30,
         )
         if resp.status_code >= 400:
             return RollbackResult(ok=False, message=f"Restore failed: {resp.status_code} {resp.text[:200]}")

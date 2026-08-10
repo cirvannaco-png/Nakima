@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -38,10 +37,10 @@ class CredentialNotFoundError(SecretsStoreError):
 @dataclass
 class StoredCredential:
     platform: str
-    label: str                     # e.g. "prod", "cirvanna-project"
+    label: str  # e.g. "prod", "cirvanna-project"
     encrypted_value: bytes
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_used_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_used_at: datetime | None = None
 
 
 class SecretsStore:
@@ -52,12 +51,11 @@ class SecretsStore:
 
     MASTER_KEY_ENV = "NAKIMA_DEPLOY_SECRETS_KEY"
 
-    def __init__(self, backend: "SecretsBackend", master_key: Optional[str] = None):
+    def __init__(self, backend: SecretsBackend, master_key: str | None = None):
         key = master_key or os.environ.get(self.MASTER_KEY_ENV)
         if not key:
             raise MissingMasterKeyError(
-                f"Set {self.MASTER_KEY_ENV} (generate with Fernet.generate_key()) "
-                "before starting the deploy agent."
+                f"Set {self.MASTER_KEY_ENV} (generate with Fernet.generate_key()) before starting the deploy agent."
             )
         self._fernet = Fernet(key.encode() if isinstance(key, str) else key)
         self._backend = backend
@@ -69,12 +67,14 @@ class SecretsStore:
 
     def put(self, platform: str, label: str, fields: dict[str, str]) -> None:
         import json
+
         raw = json.dumps(fields).encode("utf-8")
         encrypted = self._fernet.encrypt(raw)
         self._backend.save(StoredCredential(platform=platform, label=label, encrypted_value=encrypted))
 
     def get(self, platform: str, label: str = "default") -> dict[str, str]:
         import json
+
         record = self._backend.load(platform, label)
         if record is None:
             raise CredentialNotFoundError(f"No credential stored for platform={platform} label={label}")
@@ -82,8 +82,7 @@ class SecretsStore:
             raw = self._fernet.decrypt(record.encrypted_value)
         except InvalidToken as exc:
             raise SecretsStoreError(
-                f"Failed to decrypt credential for {platform}/{label} — "
-                "wrong master key or corrupted record."
+                f"Failed to decrypt credential for {platform}/{label} — wrong master key or corrupted record."
             ) from exc
         self._backend.mark_used(platform, label)
         return json.loads(raw.decode("utf-8"))
@@ -98,7 +97,7 @@ class SecretsBackend:
     def save(self, credential: StoredCredential) -> None:
         raise NotImplementedError
 
-    def load(self, platform: str, label: str) -> Optional[StoredCredential]:
+    def load(self, platform: str, label: str) -> StoredCredential | None:
         raise NotImplementedError
 
     def mark_used(self, platform: str, label: str) -> None:
@@ -117,13 +116,13 @@ class InMemorySecretsBackend(SecretsBackend):
     def save(self, credential: StoredCredential) -> None:
         self._store[(credential.platform, credential.label)] = credential
 
-    def load(self, platform: str, label: str) -> Optional[StoredCredential]:
+    def load(self, platform: str, label: str) -> StoredCredential | None:
         return self._store.get((platform, label))
 
     def mark_used(self, platform: str, label: str) -> None:
         key = (platform, label)
         if key in self._store:
-            self._store[key].last_used_at = datetime.now(timezone.utc)
+            self._store[key].last_used_at = datetime.now(UTC)
 
     def delete(self, platform: str, label: str) -> None:
         self._store.pop((platform, label), None)

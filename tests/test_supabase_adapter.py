@@ -1,14 +1,14 @@
 import os
+import sys
 import tempfile
 
 import pytest
 import requests_mock
 
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from deploy_agent.adapters.supabase import SupabaseAdapter
-from deploy_agent.models import DeployConfig, DeployRun, DeployStatusState
+from deploy_agent.adapters.supabase import SupabaseAdapter  # noqa: E402
+from deploy_agent.models import DeployConfig, DeployRun, DeployStatusState  # noqa: E402
 
 
 @pytest.fixture
@@ -22,7 +22,9 @@ def migration_file():
 def test_migration_marked_high_risk_and_destructive(migration_file):
     adapter = SupabaseAdapter(credentials={"access_token": "tok"})
     config = DeployConfig(
-        platform="supabase", project_ref="abcd1234", artifact_path=migration_file,
+        platform="supabase",
+        project_ref="abcd1234",
+        artifact_path=migration_file,
         extra={"target": "migration"},
     )
     plan = adapter.plan(config)
@@ -34,7 +36,9 @@ def test_migration_marked_high_risk_and_destructive(migration_file):
 def test_migration_execute_sends_real_sql_as_query(migration_file):
     adapter = SupabaseAdapter(credentials={"access_token": "tok"})
     config = DeployConfig(
-        platform="supabase", project_ref="abcd1234", artifact_path=migration_file,
+        platform="supabase",
+        project_ref="abcd1234",
+        artifact_path=migration_file,
         extra={"target": "migration"},
     )
     plan = adapter.plan(config)
@@ -68,7 +72,9 @@ def test_edge_function_deploy_and_status():
         f.write("export default () => new Response('ok')")
 
     config = DeployConfig(
-        platform="supabase", project_ref="abcd1234", artifact_path=fn_path,
+        platform="supabase",
+        project_ref="abcd1234",
+        artifact_path=fn_path,
         extra={"target": "edge_function", "function_name": "hello"},
     )
     plan = adapter.plan(config)

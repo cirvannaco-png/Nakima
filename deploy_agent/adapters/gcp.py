@@ -22,8 +22,14 @@ import logging
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.gcp")
@@ -39,13 +45,13 @@ class GCPAdapter(DeployAdapter):
             from google.oauth2 import service_account
         except ImportError as exc:
             raise RuntimeError(
-                "The GCP adapter requires the optional 'google-cloud-run' and "
-                "'google-auth' packages."
+                "The GCP adapter requires the optional 'google-cloud-run' and 'google-auth' packages."
             ) from exc
         return run_v2, service_account
 
     def _credentials(self):
         import json
+
         _, service_account = self._sdk()
         sa_info = json.loads(self.credentials["service_account_json"])
         return service_account.Credentials.from_service_account_info(sa_info)
@@ -68,9 +74,7 @@ class GCPAdapter(DeployAdapter):
         try:
             run_v2, _ = self._sdk()
             client = run_v2.ServicesClient(credentials=self._credentials())
-            name = self._service_path(
-                self.credentials["project_id"], self.credentials["region"], config.project_ref
-            )
+            name = self._service_path(self.credentials["project_id"], self.credentials["region"], config.project_ref)
             client.get_service(name=name)
         except Exception as exc:
             if "404" not in str(exc) and "not_found" not in str(exc).lower():
@@ -83,8 +87,7 @@ class GCPAdapter(DeployAdapter):
         traffic_pct = config.extra.get("traffic_percent", 100)
         return DeployPlan(
             platform=self.platform,
-            summary=f"Deploy new revision of Cloud Run service '{config.project_ref}' "
-                    f"({config.extra.get('image')})",
+            summary=f"Deploy new revision of Cloud Run service '{config.project_ref}' ({config.extra.get('image')})",
             changes=[
                 f"Create new revision from image {config.extra.get('image')}",
                 f"Route {traffic_pct}% traffic to new revision"
@@ -108,21 +111,22 @@ class GCPAdapter(DeployAdapter):
 
         traffic_pct = config.extra.get("traffic_percent", 100)
         service.traffic = [
-            run_v2.TrafficTarget(type_=run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST,
-                                  percent=traffic_pct)
+            run_v2.TrafficTarget(
+                type_=run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST, percent=traffic_pct
+            )
         ]
 
         operation = client.update_service(service=service)
         updated_service = operation.result(timeout=300)  # blocks until the operation completes
 
-        logger.info("Cloud Run service updated: %s -> revision %s",
-                    config.project_ref, updated_service.latest_ready_revision)
+        logger.info(
+            "Cloud Run service updated: %s -> revision %s", config.project_ref, updated_service.latest_ready_revision
+        )
         return DeployRun(
             plan_id=plan.id,
             platform=self.platform,
             external_id=updated_service.latest_ready_revision,
-            logs_url=f"https://console.cloud.google.com/run/detail/{region}/{config.project_ref}"
-                     f"?project={project_id}",
+            logs_url=f"https://console.cloud.google.com/run/detail/{region}/{config.project_ref}?project={project_id}",
             metadata={"project_id": project_id, "region": region, "service_name": config.project_ref},
         )
 
@@ -147,15 +151,13 @@ class GCPAdapter(DeployAdapter):
             return RollbackResult(
                 ok=False,
                 message="No previous_revision recorded in run.metadata — list revisions via "
-                        "RevisionsClient.list_revisions() to find one to roll back to.",
+                "RevisionsClient.list_revisions() to find one to roll back to.",
             )
         run_v2, _ = self._sdk()
         client = run_v2.ServicesClient(credentials=self._credentials())
         name = self._service_path(run.metadata["project_id"], run.metadata["region"], run.metadata["service_name"])
         service = client.get_service(name=name)
-        service.traffic = [
-            run_v2.TrafficTarget(revision=previous_revision, percent=100)
-        ]
+        service.traffic = [run_v2.TrafficTarget(revision=previous_revision, percent=100)]
         operation = client.update_service(service=service)
         operation.result(timeout=120)
         return RollbackResult(ok=True, restored_to=previous_revision)

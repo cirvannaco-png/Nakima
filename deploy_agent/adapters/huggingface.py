@@ -19,12 +19,22 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from ..adapter import DeployAdapter
 from ..models import (
-    DeployConfig, DeployPlan, DeployRun, DeployStatus, DeployStatusState,
-    RiskLevel, RollbackResult, ValidationResult,
+    DeployConfig,
+    DeployPlan,
+    DeployRun,
+    DeployStatus,
+    DeployStatusState,
+    RiskLevel,
+    RollbackResult,
+    ValidationResult,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from huggingface_hub import HfApi
 
 logger = logging.getLogger("nakima.deploy_agent.adapters.huggingface")
 
@@ -40,9 +50,7 @@ class HuggingFaceAdapter(DeployAdapter):
             from huggingface_hub import HfApi
             from huggingface_hub.utils import HfHubHTTPError, RepositoryNotFoundError
         except ImportError as exc:
-            raise RuntimeError(
-                "The Hugging Face adapter requires the optional 'huggingface_hub' package."
-            ) from exc
+            raise RuntimeError("The Hugging Face adapter requires the optional 'huggingface_hub' package.") from exc
         return HfApi, HfHubHTTPError, RepositoryNotFoundError
 
     def _api(self) -> HfApi:
@@ -81,8 +89,7 @@ class HuggingFaceAdapter(DeployAdapter):
         file_count = sum(len(files) for _, _, files in os.walk(config.artifact_path))
         return DeployPlan(
             platform=self.platform,
-            summary=f"Upload {file_count} files to HF Space '{config.project_ref}' "
-                    f"(sdk={config.extra.get('sdk')})",
+            summary=f"Upload {file_count} files to HF Space '{config.project_ref}' (sdk={config.extra.get('sdk')})",
             changes=[
                 f"Upload folder {config.artifact_path} -> {config.project_ref}",
                 "Space rebuilds automatically on push (standard HF Spaces behavior)",
@@ -138,10 +145,10 @@ class HuggingFaceAdapter(DeployAdapter):
             return RollbackResult(
                 ok=False,
                 message="No rollback_to_commit in run.metadata — check the Space's commit "
-                        "history and supply the SHA to revert to.",
+                "history and supply the SHA to revert to.",
             )
         return RollbackResult(
             ok=False,
             message=f"Rollback requires re-running execute() with the artifact checked out at "
-                    f"commit {prior_revision} — no separate 'revert' API exists for Spaces.",
+            f"commit {prior_revision} — no separate 'revert' API exists for Spaces.",
         )
