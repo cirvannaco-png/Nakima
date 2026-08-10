@@ -18,6 +18,7 @@ PyYAML>=6.0.2
 
 # ─── HTTP client ─────────────────────────────────────────────────────────────
 httpx>=0.28.1
+requests>=2.31.0
 
 # ─── GitHub App auth + API client ────────────────────────────────────────────
 # PyJWT: CVE-2026-48526 fixed in >=2.13.0; enforce minimum safe version.

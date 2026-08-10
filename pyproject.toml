@@ -32,6 +32,7 @@ include = [
   "githubapp*", "intelligence*", "memory*", "models*", "monitoring*",
   "neis*", "orchestrator*", "planner*", "providers*", "quality*",
   "reports*", "repository*", "security*", "utils*", "validation*",
+  "deploy_agent*",
 ]
 exclude = ["tests*", "alembic*", "scripts*"]
 

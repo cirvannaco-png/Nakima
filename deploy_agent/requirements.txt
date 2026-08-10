@@ -1,0 +1,6 @@
+requests>=2.31
+huggingface_hub>=0.24
+google-cloud-compute>=1.19
+google-cloud-run>=0.10
+google-auth>=2.30
+cryptography>=42
