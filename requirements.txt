@@ -50,7 +50,7 @@ prometheus-client>=0.21.1
 # ─── Graph / analysis helpers ────────────────────────────────────────────────
 networkx>=3.5
 radon>=6.0.1
-slowapi>=0.1.9
+slowapi>=0.1.10
 
 # ─── Semver comparison ───────────────────────────────────────────────────────
 packaging>=25.0
