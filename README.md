@@ -2,7 +2,12 @@
 
 > **Autonomous AI GitHub App** — analyzes repositories, plans changes, generates code, validates quality, and opens pull requests from issues. Production-grade, security-first.
 
-[![CI](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml/badge.svg)](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml)
+[![CI](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/cirvannaco-png/Nakima/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/cirvannaco-png/Nakima/actions/workflows/code-quality.yml)
+[![Deploy](https://github.com/cirvannaco-png/Nakima/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/cirvannaco-png/Nakima/actions/workflows/deploy.yml)
+[![Staging](https://github.com/cirvannaco-png/Nakima/actions/workflows/staging.yml/badge.svg?branch=develop)](https://github.com/cirvannaco-png/Nakima/actions/workflows/staging.yml)
+[![Container Scan](https://img.shields.io/badge/container%20scan-Trivy-1904DA.svg?logo=aquasecurity&logoColor=white)](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen.svg)](https://github.com/cirvannaco-png/Nakima/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
@@ -315,6 +320,19 @@ See [Lab & Sandbox Overview](docs/LAB_OVERVIEW.md) for the full data flow.
 ---
 
 ## Deployment Pipelines
+
+### Container Vulnerability Scanning
+
+Trivy runs at three points in the pipeline, so no unscanned image can reach an environment:
+
+| Stage | Scan | Gate |
+| --- | --- | --- |
+| CI (`trivy`) | `Dockerfile` and `Dockerfile.sandbox` images, OS + library CVEs | fails on fixable `CRITICAL`/`HIGH` |
+| CI (`trivy-config`) | Dockerfile / IaC misconfigurations | fails on `CRITICAL`/`HIGH` |
+| Deploy & Staging (`scan`) | the published GHCR image (`:latest` / `:staging`) | blocks the deploy on fixable `CRITICAL`/`HIGH` |
+
+Every scan also uploads a SARIF report (including `MEDIUM` findings) to **Security → Code scanning**, categorised per image (`trivy-app`, `trivy-sandbox`, `trivy-production`, `trivy-staging`), and attaches it as a build artifact. `ignore-unfixed` is enabled so the gate only blocks on CVEs that actually have a patched version available.
+
 
 Three GitHub Actions workflows form the delivery chain. Nothing deploys unless
 CI is green on the exact commit being shipped.

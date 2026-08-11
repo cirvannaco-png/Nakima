@@ -71,9 +71,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  scan:
+    name: Scan staging image (Trivy)
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trivy report (SARIF)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:staging
+          format: "sarif"
+          output: "trivy-staging.sarif"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH,MEDIUM"
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-staging.sarif"
+          category: "trivy-staging"
+
+      # Blocks the deploy when the image that would ship has fixable
+      # CRITICAL/HIGH CVEs.
+      - name: Trivy gate (CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:staging
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+          skip-setup-trivy: true
+
   deploy:
     name: Deploy to staging
-    needs: image
+    needs: [image, scan]
     runs-on: ubuntu-latest
     environment: staging
     outputs:
@@ -115,7 +162,7 @@ jobs:
 
   rollback:
     name: Rollback staging
-    needs: [image, deploy]
+    needs: [image, scan, deploy]
     if: failure() && needs.image.outputs.previous != ''
     runs-on: ubuntu-latest
     environment: staging

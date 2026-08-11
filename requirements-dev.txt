@@ -3,7 +3,7 @@
 # pytest-asyncio>=1.4.0 is required for pytest>=9 compatibility (0.24.x required pytest<9).
 pytest>=9.0.3
 pytest-asyncio>=1.4.0
-pytest-cov>=6.1.0
+pytest-cov>=7.1.0
 requests-mock>=1.12.1
 
 # SAST / linting
