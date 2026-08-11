@@ -327,8 +327,8 @@ Trivy runs at three points in the pipeline, so no unscanned image can reach an e
 
 | Stage | Scan | Gate |
 | --- | --- | --- |
-| CI (`trivy`) | `Dockerfile` and `Dockerfile.sandbox` images, OS + library CVEs | fails on fixable `CRITICAL`/`HIGH` |
-| CI (`trivy-config`) | Dockerfile / IaC misconfigurations | fails on `CRITICAL`/`HIGH` |
+| CI (`trivy`) | `Dockerfile` and `Dockerfile.sandbox` images, OS + library CVEs | app image fails on fixable `CRITICAL`/`HIGH`; sandbox image is report-only |
+| CI (`trivy-config`) | Dockerfile / IaC misconfigurations | Dockerfile fails on `CRITICAL`/`HIGH`; wider IaC is report-only |
 | Deploy & Staging (`scan`) | the published GHCR image (`:latest` / `:staging`) | blocks the deploy on fixable `CRITICAL`/`HIGH` |
 
 Every scan also uploads a SARIF report (including `MEDIUM` findings) to **Security → Code scanning**, categorised per image (`trivy-app`, `trivy-sandbox`, `trivy-production`, `trivy-staging`), and attaches it as a build artifact. `ignore-unfixed` is enabled so the gate only blocks on CVEs that actually have a patched version available.
