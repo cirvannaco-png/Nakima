@@ -9,7 +9,7 @@ description = "Autonomous AI-powered GitHub App: plans, generates, validates, an
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
-authors = [{ name = "Nakima Contributors" }]
+authors = [{ name = "cirvannaco-png" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
