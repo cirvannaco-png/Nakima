@@ -1,4 +1,15 @@
-# ─── Build stage ──────────────────────────────────────────────────────────────
+# ─── Diff-review frontend build stage ─────────────────────────────────────────
+FROM node:20-bookworm-slim AS diff_review_builder
+
+WORKDIR /build/nakima_diff_review
+
+COPY nakima_diff_review/package*.json ./
+RUN npm ci
+
+COPY nakima_diff_review/ ./
+RUN npm run build
+
+# ─── Python build stage ───────────────────────────────────────────────────────
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
@@ -31,8 +42,12 @@ COPY --from=builder /install /usr/local
 # Copy application code
 COPY --chown=nakima:nakima . .
 
+# Publish the built diff-review frontend through FastAPI's /static mount.
+COPY --from=diff_review_builder --chown=nakima:nakima \
+    /build/nakima_diff_review/dist /app/static/diff-review
+
 # Remove dev/test artefacts from the image
-RUN rm -rf tests/ scripts/ attached_assets/ .github/ .git/ \
+RUN rm -rf tests/ scripts/ attached_assets/ .github/ .git/ nakima_diff_review/ \
     && find . -name "*.pyc" -delete \
     && find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
