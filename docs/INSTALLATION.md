@@ -1,5 +1,7 @@
 # Nakima Installation Guide
 
+> This guide is for authorized contributors and auditors working with the source. It is not an invitation to self-host Nakima in production; see the hosted GitHub App for user access.
+
 ## Prerequisites
 
 | Requirement | Minimum | Notes |

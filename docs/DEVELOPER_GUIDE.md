@@ -1,5 +1,7 @@
 # Nakima Developer Guide
 
+> This guide is for authorized contributors and auditors. Local setup is for development and review only, not an invitation to self-host Nakima in production.
+
 ## Development Setup
 
 ### Prerequisites

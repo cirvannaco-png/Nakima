@@ -1,88 +1,50 @@
-NAKIMA PROPRIETARY LICENSE
-Version 1.0 — Effective Date: July 20, 2026
+Nakima Proprietary License
+Copyright (c) 2026 Kelson / Cirvanna. All rights reserved.
 
-Copyright (c) 2026 Nakima Contributors. All rights reserved.
+1. GRANT OF ACCESS
+This repository and its contents (the "Software") are made visible to
+authorized viewers solely for evaluation, security review, and audit
+purposes. No license, right, or permission is granted to use, copy,
+modify, merge, publish, distribute, sublicense, self-host, deploy, or
+sell copies of the Software, in whole or in part, except as expressly
+authorized in writing by the copyright holder.
 
-──────────────────────────────────────────────────────────────────────────────
-PREAMBLE
-──────────────────────────────────────────────────────────────────────────────
+2. NO SELF-HOSTING
+Running the Software, in whole or in part, on any infrastructure other
+than infrastructure operated directly by the copyright holder is
+prohibited. This includes local, on-premises, and third-party cloud
+deployments. The only supported way to use Nakima's functionality is
+the hosted GitHub App operated by the copyright holder, which is
+governed by separate Terms of Service.
 
-This software ("Nakima") is proprietary. The source code is made available
-for reference and audit purposes only. You may not use this source code to
-operate, host, or build a competing service, product, or derivative work.
+3. NO DERIVATIVE WORKS
+You may not create derivative works based on the Software, including
+forks intended for independent operation, redistribution, or commercial
+use.
 
-You ARE permitted to use the Nakima GitHub App (the hosted service at
-https://github.com/apps/nakima, once publicly launched) under the separate
-Terms of Service published at that URL.
+4. CONTRIBUTIONS
+Any code, documentation, or other material submitted to this repository
+(a "Contribution") is, upon submission, assigned to and becomes the
+sole property of the copyright holder. Contributors retain no license
+back to their Contribution beyond what is granted under Section 1.
 
-──────────────────────────────────────────────────────────────────────────────
-GRANT OF RIGHTS
-──────────────────────────────────────────────────────────────────────────────
+5. AUDIT AND SECURITY REVIEW
+Security researchers and auditors may read, analyze, and report on the
+Software for the purpose of identifying vulnerabilities, subject to
+responsible disclosure norms. This does not grant any right to use,
+deploy, or redistribute the Software.
 
-Subject to the restrictions below, you are granted a limited, non-exclusive,
-non-transferable, royalty-free right to:
+6. NO WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR
+ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR
+ITS USE.
 
-  1. READ this source code for personal educational or security-audit
-     purposes only.
+7. TERMINATION
+Any use in violation of this license automatically terminates your
+access rights under Section 1.
 
-  2. USE the hosted Nakima GitHub App service once it is publicly launched,
-     subject to the service's separate Terms of Service.
-
-  3. CONTRIBUTE to this repository via pull requests, subject to the
-     Contributor License Agreement below.
-
-──────────────────────────────────────────────────────────────────────────────
-RESTRICTIONS — YOU MAY NOT
-──────────────────────────────────────────────────────────────────────────────
-
-  a. Copy, reproduce, distribute, publish, or sublicense this source code or
-     any substantial portion of it, in source or compiled form, with or
-     without modification.
-
-  b. Deploy, host, or operate any service, application, or product derived
-     from or substantially similar to this source code.
-
-  c. Remove or alter any copyright, licence, or proprietary notice contained
-     in this source code.
-
-  d. Use this source code or any derivative to train, fine-tune, or distil
-     any machine-learning model.
-
-  e. Reverse-engineer the compiled form of any Nakima service for purposes
-     beyond those explicitly permitted above.
-
-  f. Sublicense, sell, rent, lease, or otherwise transfer any rights granted
-     under this Licence.
-
-──────────────────────────────────────────────────────────────────────────────
-CONTRIBUTOR LICENSE AGREEMENT
-──────────────────────────────────────────────────────────────────────────────
-
-By submitting a pull request or other contribution to this repository, you:
-
-  1. Confirm that you have the right to grant, and hereby grant, to Nakima
-     Contributors an irrevocable, worldwide, royalty-free licence to use,
-     reproduce, modify, and distribute your contribution as part of this
-     project under any licence the project maintainers choose.
-
-  2. Acknowledge that your contribution becomes subject to this Licence.
-
-──────────────────────────────────────────────────────────────────────────────
-DISCLAIMER
-──────────────────────────────────────────────────────────────────────────────
-
-THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
-FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-──────────────────────────────────────────────────────────────────────────────
-CONTACT
-──────────────────────────────────────────────────────────────────────────────
-
-For licensing enquiries, commercial arrangements, or partnership discussions,
-open an issue at https://github.com/cirvannaco-png/Nakima or contact the
-maintainers through the GitHub profile.
+For licensing inquiries, commercial use, or partnership requests,
+contact the copyright holder directly.

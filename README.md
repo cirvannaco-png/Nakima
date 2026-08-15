@@ -16,7 +16,7 @@
 
 ## What Is Nakima?
 
-Nakima is a self-hosted GitHub App that turns GitHub Issues into validated Pull Requests — automatically. It combines:
+Nakima is a hosted GitHub App that turns GitHub Issues into validated Pull Requests — automatically. It combines:
 
 - **Repository Intelligence** — AST-based code analysis, dependency graphs, health scoring
 - **AI Orchestration** — multi-provider LLM planning, code generation, and review
@@ -92,30 +92,15 @@ GitHub Issue
 
 ---
 
-## Quick Start (Self-Hosted)
+## Access
 
-> Prerequisites: Docker ≥ 24, Docker Compose ≥ 2.20, a GitHub App with `issues: read`, `contents: write`, `pull_requests: write` permissions.
+Nakima is proprietary software. Source is available in this
+repository for audit and security review only — it is not licensed
+for self-hosting, deployment, or redistribution. See [LICENSE](./LICENSE).
 
-```bash
-# 1 — Clone
-git clone https://github.com/cirvannaco-png/Nakima.git
-cd Nakima
-
-# 2 — Configure
-cp .env.example .env
-# Fill in GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH, GITHUB_WEBHOOK_SECRET, GITHUB_TOKEN
-
-# 3 — Build & start
-docker compose up --build -d
-
-# 4 — Run migrations
-docker compose exec app alembic upgrade head
-
-# 5 — Verify
-curl http://localhost:8000/health
-```
-
-The Command Centre dashboard is at `http://localhost:8000/`.
+To use Nakima on your repositories, install the hosted GitHub App:
+[github.com/apps/nakima](https://github.com/apps/nakima) (once
+publicly launched). Usage is governed by separate Terms of Service.
 API docs (Swagger) are at `http://localhost:8000/docs`.
 
 ---

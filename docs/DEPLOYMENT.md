@@ -1,8 +1,10 @@
 # Nakima Deployment Guide
 
+> These deployment manifests describe operations for the hosted Nakima service and authorized audit environments. They are not instructions or permission to self-host Nakima in production.
+
 ## Docker (Recommended)
 
-The `docker-compose.yml` in the repository root covers local and single-node production deployments.
+The `docker-compose.yml` in the repository root covers contributor/audit environments and the hosted service's single-node deployment.
 
 ### Production checklist before going live
 
