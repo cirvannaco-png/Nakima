@@ -7,6 +7,6 @@ pytest-cov>=7.1.0
 requests-mock>=1.12.1
 
 # SAST / linting
-bandit>=1.8.5
+bandit>=1.9.4
 ruff==0.16.2
 flake8==7.2.0
