@@ -8,5 +8,5 @@ requests-mock>=1.12.1
 
 # SAST / linting
 bandit>=1.8.5
-ruff==0.16.2
+ruff==0.16.3
 flake8==7.2.0
