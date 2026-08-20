@@ -1,5 +1,5 @@
 # ─── Diff-review frontend build stage ─────────────────────────────────────────
-FROM node:20-bookworm-slim AS diff_review_builder
+FROM node:26-bookworm-slim AS diff_review_builder
 
 WORKDIR /build/nakima_diff_review
 
