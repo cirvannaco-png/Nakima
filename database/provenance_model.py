@@ -10,9 +10,9 @@ on line 14 to match your actual base module, e.g. database.base).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Index
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from database.base import Base  # adjust to your actual declarative base import
@@ -40,11 +40,9 @@ class ProvenanceRecordORM(Base):
     lines_added = Column(Integer, default=0)
     lines_removed = Column(Integer, default=0)
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
-    __table_args__ = (
-        Index("ix_provenance_repo_created", "repo", "created_at"),
-    )
+    __table_args__ = (Index("ix_provenance_repo_created", "repo", "created_at"),)
 
     def to_dict(self) -> dict:
         return {

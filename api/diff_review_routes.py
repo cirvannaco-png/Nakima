@@ -22,33 +22,33 @@ Assumes:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from tempfile import NamedTemporaryFile
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-
-from database.provenance_model import ProvenanceRecordORM
-from database.session import get_db  # adjust to your actual session dependency
-from core.provenance import hunk_hash
-from reports.contribution_report import generate_contribution_report
+from orchestrator.implementer import regenerate_hunk
 
 # adjust these two imports to your actual module paths
 from providers.registry import get_provider
-from orchestrator.implementer import regenerate_hunk
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from core.provenance import hunk_hash
+from database.provenance_model import ProvenanceRecordORM
+from database.session import get_db  # adjust to your actual session dependency
+from reports.contribution_report import generate_contribution_report
 
 diff_review_router = APIRouter(tags=["diff-review"])
 
 
 # ---------- Schemas ----------
 
+
 class HunkActionRequest(BaseModel):
     action: str  # "accepted" | "edited" | "rejected"
     human_actor: str
-    final_diff_text: Optional[str] = None  # required if action == "edited"
+    final_diff_text: str | None = None  # required if action == "edited"
 
 
 class ModelSwapRequest(BaseModel):
@@ -57,6 +57,7 @@ class ModelSwapRequest(BaseModel):
 
 
 # ---------- Diff review endpoints ----------
+
 
 @diff_review_router.get("/repos/{owner}/{repo}/prs/{pr_number}/hunks")
 def list_hunks(owner: str, repo: str, pr_number: int, db: Session = Depends(get_db)):
@@ -123,13 +124,14 @@ def swap_model(record_id: str, body: ModelSwapRequest, db: Session = Depends(get
     record.human_actor = body.human_actor
     record.accepted_verbatim = None  # unknown again until re-reviewed
     record.hunk_hash = hunk_hash(new_diff)
-    record.created_at = datetime.now(timezone.utc)
+    record.created_at = datetime.now(UTC)
 
     db.commit()
     return {"record": record.to_dict(), "new_diff": new_diff}
 
 
 # ---------- Narrative agent: contribution report ----------
+
 
 @diff_review_router.get("/repos/{owner}/{repo}/contribution-report.pdf")
 def contribution_report(owner: str, repo: str, db: Session = Depends(get_db)):
@@ -161,7 +163,7 @@ def contribution_report(owner: str, repo: str, db: Session = Depends(get_db)):
 
     summary = {
         "repo": full_repo,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "total_records": len(records),
         "total_lines_added": total_added,
         "total_lines_removed": total_removed,

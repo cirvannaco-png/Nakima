@@ -12,17 +12,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    SimpleDocTemplate,
+    PageBreak,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    PageBreak,
 )
 
 
@@ -56,9 +56,7 @@ def generate_contribution_report(summary: dict, output_path: str) -> str:
     # --- Header ---
     story.append(Paragraph("Contribution Report", styles["Title"]))
     story.append(Paragraph(summary["repo"], styles["Heading2"]))
-    generated = datetime.fromisoformat(summary["generated_at"]).strftime(
-        "%B %d, %Y at %H:%M UTC"
-    )
+    generated = datetime.fromisoformat(summary["generated_at"]).strftime("%B %d, %Y at %H:%M UTC")
     story.append(Paragraph(f"Generated {generated}", styles["Normal"]))
     story.append(Spacer(1, 16))
 
@@ -133,9 +131,7 @@ def generate_contribution_report(summary: dict, output_path: str) -> str:
     # --- By agent ---
     if summary["by_agent"]:
         story.append(Paragraph("By Agent / Model", styles["Heading2"]))
-        agent_rows = [["Agent", "Changes"]] + [
-            [name, str(count)] for name, count in summary["by_agent"].items()
-        ]
+        agent_rows = [["Agent", "Changes"]] + [[name, str(count)] for name, count in summary["by_agent"].items()]
         agent_table = Table(agent_rows, colWidths=[3 * inch, 1.5 * inch])
         agent_table.setStyle(
             TableStyle(
@@ -155,9 +151,7 @@ def generate_contribution_report(summary: dict, output_path: str) -> str:
     # --- By human ---
     if summary["by_human"]:
         story.append(Paragraph("By Human Reviewer/Author", styles["Heading2"]))
-        human_rows = [["Contributor", "Changes"]] + [
-            [name, str(count)] for name, count in summary["by_human"].items()
-        ]
+        human_rows = [["Contributor", "Changes"]] + [[name, str(count)] for name, count in summary["by_human"].items()]
         human_table = Table(human_rows, colWidths=[3 * inch, 1.5 * inch])
         human_table.setStyle(
             TableStyle(
@@ -189,9 +183,7 @@ def generate_contribution_report(summary: dict, output_path: str) -> str:
                 str(r.get("accepted_verbatim")) if r.get("accepted_verbatim") is not None else "-",
             ]
         )
-    detail_table = Table(
-        detail_rows, colWidths=[1.8 * inch, 1.1 * inch, 1.3 * inch, 0.7 * inch, 0.9 * inch]
-    )
+    detail_table = Table(detail_rows, colWidths=[1.8 * inch, 1.1 * inch, 1.3 * inch, 0.7 * inch, 0.9 * inch])
     detail_table.setStyle(
         TableStyle(
             [

@@ -14,8 +14,10 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-# Install build tools only in builder
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install build tools only in builder. Security patches are applied first so a
+# stale base-image layer can't ship known-fixed CVEs.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,8 +33,11 @@ RUN groupadd --gid 1001 nakima && \
 
 WORKDIR /app
 
-# Runtime deps only (libpq for asyncpg, git for gitpython clone_from)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Apply the distro's security updates (util-linux et al. are patched after the
+# base image is cut), then install runtime deps only: libpq for asyncpg and git
+# for gitpython clone_from.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     libpq5 curl git \
     && rm -rf /var/lib/apt/lists/*
 
