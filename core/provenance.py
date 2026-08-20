@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 
 class ContributorType(str, Enum):
@@ -32,19 +31,17 @@ class ProvenanceRecord:
 
     record_id: str
     repo: str
-    commit_sha: Optional[str]
+    commit_sha: str | None
     file_path: str
-    hunk_hash: str                     # hash of the diff hunk content, for integrity
+    hunk_hash: str  # hash of the diff hunk content, for integrity
     contributor_type: ContributorType
-    agent_name: Optional[str] = None   # e.g. "nakima-implementer", "claude-sonnet-4-6"
-    model_id: Optional[str] = None     # specific model string if AI-originated
-    issue_ref: Optional[str] = None    # GitHub issue/PR number that triggered this
-    prompt_ref: Optional[str] = None   # pointer to the prompt/plan step, not raw prompt text
-    human_actor: Optional[str] = None  # GitHub username, if human wrote or edited
-    accepted_verbatim: Optional[bool] = None  # True if AI output merged with no human edits
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    agent_name: str | None = None  # e.g. "nakima-implementer", "claude-sonnet-4-6"
+    model_id: str | None = None  # specific model string if AI-originated
+    issue_ref: str | None = None  # GitHub issue/PR number that triggered this
+    prompt_ref: str | None = None  # pointer to the prompt/plan step, not raw prompt text
+    human_actor: str | None = None  # GitHub username, if human wrote or edited
+    accepted_verbatim: bool | None = None  # True if AI output merged with no human edits
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     lines_added: int = 0
     lines_removed: int = 0
 
@@ -119,7 +116,7 @@ def tag_review_decision(
     *,
     human_actor: str,
     edited: bool,
-    final_diff_text: Optional[str] = None,
+    final_diff_text: str | None = None,
 ) -> ProvenanceRecord:
     """Call this when a human approves/edits a diff in the review UI.
     Mutates the record's classification based on what actually happened,
@@ -139,7 +136,7 @@ def tag_human_origin(
     file_path: str,
     diff_text: str,
     human_actor: str,
-    issue_ref: Optional[str] = None,
+    issue_ref: str | None = None,
     lines_added: int = 0,
     lines_removed: int = 0,
 ) -> ProvenanceRecord:
@@ -211,7 +208,7 @@ class ProvenanceStore:
 
         return {
             "repo": repo,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "total_records": len(records),
             "total_lines_added": total_added,
             "total_lines_removed": total_removed,

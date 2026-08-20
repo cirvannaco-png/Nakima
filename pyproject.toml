@@ -50,6 +50,10 @@ select = ["E", "F", "W", "I", "B", "UP", "S"]
 ignore = ["E501", "S101", "S603", "S607", "S108"]
 
 [tool.ruff.lint.per-file-ignores]
+# FastAPI dependency injection legitimately calls Depends() in argument defaults
+"api/*.py" = ["B008"]
+# str+Enum mixin kept for backwards-compatible serialization (StrEnum changes str())
+"core/provenance.py" = ["UP042"]
 # Silent exception handling is intentional in these files (documented with inline comments)
 "agents/analysis.py" = ["S112"]
 "repository/health.py" = ["S112"]
@@ -65,3 +69,12 @@ ignore = ["E501", "S101", "S603", "S607", "S108"]
 [tool.bandit]
 exclude_dirs = ["tests", "alembic/versions"]
 skips = ["B101"]
+
+[tool.coverage.run]
+# Non-runtime code: the standalone benchmark script and generated migrations
+# are executed by hand, not by the app, so they don't belong in the gate.
+omit = [
+  "tests/benchmark_security_gates.py",
+  "alembic/*",
+  "scripts/*",
+]

@@ -31,17 +31,17 @@ import json
 import sys
 from datetime import datetime
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    SimpleDocTemplate,
+    PageBreak,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    PageBreak,
 )
 
 BUCKET_INFO = {
@@ -94,15 +94,19 @@ def generate_pr_triage_report(prs: list[dict], output_path: str, repo: str = "ci
     for key, info in BUCKET_INFO.items():
         count_rows.append([info["label"], str(counts.get(key, 0)), info["criteria"]])
     count_table = Table(count_rows, colWidths=[1.1 * inch, 0.6 * inch, 4.8 * inch])
-    count_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e2327")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
+    count_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e2327")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(count_table)
     story.append(Spacer(1, 24))
 
@@ -111,34 +115,40 @@ def generate_pr_triage_report(prs: list[dict], output_path: str, repo: str = "ci
         bucket_prs = [pr for pr in prs if pr.get("bucket") == key]
         if not bucket_prs:
             continue
-        story.append(Paragraph(f'{info["label"]} ({len(bucket_prs)})', styles["Heading2"]))
+        story.append(Paragraph(f"{info['label']} ({len(bucket_prs)})", styles["Heading2"]))
         rows = [["#", "Title", "Author", "Last Activity", "Notes / Next Action"]]
         for pr in bucket_prs:
-            rows.append([
-                str(pr.get("number", "-")),
-                pr.get("title", "-"),
-                pr.get("author", "-"),
-                pr.get("last_activity", "-"),
-                pr.get("notes", "-"),
-            ])
+            rows.append(
+                [
+                    str(pr.get("number", "-")),
+                    pr.get("title", "-"),
+                    pr.get("author", "-"),
+                    pr.get("last_activity", "-"),
+                    pr.get("notes", "-"),
+                ]
+            )
         t = Table(rows, colWidths=[0.4 * inch, 1.8 * inch, 0.9 * inch, 0.9 * inch, 2.5 * inch])
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), info["color"]),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f7f7")]),
-        ]))
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), info["color"]),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f7f7")]),
+                ]
+            )
+        )
         story.append(t)
         story.append(Spacer(1, 16))
 
     story.append(PageBreak())
     story.append(Paragraph("Triage Criteria Reference", styles["Heading2"]))
-    for key, info in BUCKET_INFO.items():
-        story.append(Paragraph(f'<b>{info["label"]}</b> — {info["criteria"]}', styles["Normal"]))
+    for _key, info in BUCKET_INFO.items():
+        story.append(Paragraph(f"<b>{info['label']}</b> — {info['criteria']}", styles["Normal"]))
         story.append(Spacer(1, 8))
 
     doc.build(story)
@@ -163,8 +173,8 @@ def generate_blank_template(output_path: str, repo: str = "cirvannaco-png/Nakima
         ),
         Spacer(1, 20),
     ]
-    for key, info in BUCKET_INFO.items():
-        story.append(Paragraph(f'<b>{info["label"]}</b>', styles["Heading2"]))
+    for _key, info in BUCKET_INFO.items():
+        story.append(Paragraph(f"<b>{info['label']}</b>", styles["Heading2"]))
         story.append(Paragraph(info["criteria"], styles["Normal"]))
         story.append(Spacer(1, 12))
     doc.build(story)
