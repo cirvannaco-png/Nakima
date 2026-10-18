@@ -6,8 +6,8 @@ replaces, the existing repository dependency graph and AST analysis.
 
 import math
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 SUPPORTED_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".go"}
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "dist", "build"}
