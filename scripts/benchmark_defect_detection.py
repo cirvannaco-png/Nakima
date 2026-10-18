@@ -98,7 +98,11 @@ def main():
     if args.max_tokens < 1 or args.max_tokens > 2048:
         parser.error("--max-tokens must be between 1 and 2048 for a bounded benchmark")
 
-    cases = [json.loads(line) for line in Path(args.cases).read_text().splitlines() if line.strip()]
+    cases = [
+        json.loads(line)
+        for line in Path(args.cases).read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
     if not cases:
         parser.error("cases file is empty")
 
