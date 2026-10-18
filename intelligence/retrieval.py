@@ -71,10 +71,7 @@ def retrieve_code_evidence(
     if not documents:
         return []
 
-    document_frequency = {
-        term: sum(1 for _, _, tokens in documents if term in set(tokens))
-        for term in query_terms
-    }
+    document_frequency = {term: sum(1 for _, _, tokens in documents if term in set(tokens)) for term in query_terms}
     avg_length = sum(len(tokens) for _, _, tokens in documents) / len(documents)
     scored: list[tuple[float, str, int, str, list[str]]] = []
     for relative, lines, tokens in documents:
@@ -87,8 +84,7 @@ def retrieve_code_evidence(
             frequency = token_counts.get(term, 0)
             if not frequency:
                 continue
-            idf = math.log(1 + (len(documents) - document_frequency[term] + 0.5) /
-                           (document_frequency[term] + 0.5))
+            idf = math.log(1 + (len(documents) - document_frequency[term] + 0.5) / (document_frequency[term] + 0.5))
             score += idf * (frequency * 2.2) / (frequency + 1.2 * (0.25 + 0.75 * length_norm))
 
         if score <= 0:
