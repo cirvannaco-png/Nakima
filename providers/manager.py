@@ -17,6 +17,7 @@ class ProviderManager:
         provider_map = {
             # Default: free, OpenAI-compatible, auth via GITHUB_TOKEN.
             "github": "providers.implementations.github_models.GitHubModelsProvider",
+            "huggingface": "providers.implementations.huggingface_endpoint.HuggingFaceEndpointProvider",
             # Optional paid providers — enabled only when their API key is set.
             "claude": "providers.implementations.claude.ClaudeProvider",
             # codex, copilot, deepseek, replit follow the same AIProvider
