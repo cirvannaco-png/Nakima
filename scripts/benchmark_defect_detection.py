@@ -38,10 +38,13 @@ def parse_findings(content):
     # Models sometimes wrap JSON in a Markdown fence. Reject malformed output
     # rather than silently converting an unparseable response into zero findings.
     text = content.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-        if text.endswith("```"):
-            text = text[:-3].strip()
+    if text.startswith(chr(96) * 3):
+        lines = text.splitlines()
+        if lines and lines[0].startswith(chr(96) * 3):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == chr(96) * 3:
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
     value = json.loads(text)
     findings = value.get("findings")
     if not isinstance(findings, list):
