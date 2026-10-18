@@ -6,6 +6,10 @@ def test_retrieval_ranks_relevant_source_and_excludes_requested_files(tmp_path):
         "def verify_webhook_signature(payload, secret):\n"
         "    return hmac.compare_digest(signature, expected)\n"
     )
+    (tmp_path / "auth_helper.py").write_text(
+        "def verify_webhook_signature(payload, secret):\n"
+        "    return hmac.compare_digest(signature, expected)\n"
+    )
     (tmp_path / "billing.py").write_text(
         "def calculate_invoice(subtotal, tax):\n"
         "    return subtotal + tax\n"
