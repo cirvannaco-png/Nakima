@@ -95,7 +95,7 @@ class HuggingFaceEndpointProvider(AIProvider):
                 model=data.get("model", self.model),
                 usage=data.get("usage", {}),
             )
-        except (httpx.TimeoutException, httpx.HTTPError, ValueError, RuntimeError) as exc:
+        except Exception as exc:
             # Fallback is explicit configuration, never an implicit second paid call.
             if self.fallback_provider and self.fallback_provider != "huggingface":
                 try:
