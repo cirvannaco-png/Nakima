@@ -19,6 +19,8 @@ def test_retrieval_ranks_relevant_source_and_excludes_requested_files(tmp_path):
         exclude_files=["auth.py"],
     )
 
+    assert results
+    assert results[0]["file"] == "auth_helper.py"
     assert all(item["file"] != "auth.py" for item in results)
     assert all(".git" not in str(item["file"]) for item in results)
 
