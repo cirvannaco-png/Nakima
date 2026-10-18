@@ -3,6 +3,7 @@
 This is intentionally dependency-free and bounded. It supplements, rather than
 replaces, the existing repository dependency graph and AST analysis.
 """
+
 import math
 import re
 from pathlib import Path
