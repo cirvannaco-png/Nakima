@@ -106,7 +106,9 @@ def main():
     latencies = []
     errors = 0
     tp = fp = fn = 0
-    clean_fp = 0
+    clean_fp_findings = 0
+    clean_control_cases = 0
+    clean_control_cases_with_fp = 0
     with httpx.Client(
         timeout=httpx.Timeout(args.timeout, connect=min(10, args.timeout)), follow_redirects=False
     ) as client:
@@ -143,7 +145,10 @@ def main():
                 fp += case_fp
                 fn += case_fn
                 if case.get("clean_control"):
-                    clean_fp += len(predicted)
+                    clean_control_cases += 1
+                    if predicted:
+                        clean_control_cases_with_fp += 1
+                        clean_fp_findings += len(predicted)
                 results.append(
                     {
                         "case_id": case["case_id"],
@@ -173,7 +178,12 @@ def main():
         "precision": precision,
         "recall": recall,
         "f1": (2 * precision * recall / (precision + recall)) if precision + recall else 0.0,
-        "false_positives_on_clean_controls": clean_fp,
+        "clean_control_cases": clean_control_cases,
+        "clean_control_cases_with_false_positives": clean_control_cases_with_fp,
+        "clean_control_false_positive_rate": (
+            clean_control_cases_with_fp / clean_control_cases if clean_control_cases else None
+        ),
+        "false_positive_findings_on_clean_controls": clean_fp_findings,
         "latency_ms_p50": percentile(latencies, 0.50),
         "latency_ms_p95": percentile(latencies, 0.95),
         "ground_truth_warning": "Metrics are meaningful only for independently reviewed, representative cases.",
