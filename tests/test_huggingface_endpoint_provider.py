@@ -70,6 +70,7 @@ async def test_prompt_size_limit_falls_back_when_configured(monkeypatch):
     class Fallback:
         async def analyze(self, code, context):
             from providers.base import ProviderResponse
+
             return ProviderResponse(content="fallback result", model="mock-fallback")
 
     class Manager:
@@ -78,6 +79,7 @@ async def test_prompt_size_limit_falls_back_when_configured(monkeypatch):
             return Fallback()
 
     import providers.manager as manager_module
+
     monkeypatch.setattr(manager_module, "provider_manager", Manager())
 
     provider = HuggingFaceEndpointProvider()
