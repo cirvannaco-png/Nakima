@@ -16,10 +16,9 @@ TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
 def _tokens(text: str) -> list[str]:
     tokens: list[str] = []
     for raw in TOKEN_RE.findall(text):
-        camel_split = re.sub(r"([a-z])([A-Z])", r"\\1 \\2", raw)
-        tokens.extend(part.lower() for part in re.split(r"[_\\s]+", camel_split) if len(part) >= 3)
+        camel_split = re.sub(r"([a-z])([A-Z])", r"\1 \2", raw)
+        tokens.extend(part.lower() for part in re.split(r"[_\s]+", camel_split) if len(part) >= 3)
     return tokens
-
 
 def retrieve_code_evidence(
     repo_dir: Path,
