@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from intelligence.retrieval import retrieve_code_evidence
 from repository.graph_query import GraphQuery
 
 
@@ -43,5 +44,15 @@ class ContextBuilder:
                     "depended_on_by": [n.name for n in dependents],
                     "depends_on": [n.name for n in dependencies],
                 }
+
+        # Retrieve additional code evidence by requirement terms, without
+        # replacing explicit affected-file snippets or the dependency graph.
+        context["retrieved_code_evidence"] = retrieve_code_evidence(
+            repo_dir,
+            requirement,
+            top_k=8,
+            max_chars=max_snippet_chars,
+            exclude_files=affected_files,
+        )
 
         return context

@@ -137,9 +137,28 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: nakima:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Smoke-test the final runtime image
+        run: |
+          set -eu
+          trap 'docker rm -f nakima-smoke >/dev/null 2>&1 || true' EXIT
+          docker run -d --name nakima-smoke -p 8000:8000 nakima:ci
+          docker exec nakima-smoke sh -c 'command -v git && git --version'
+          test "$(docker exec nakima-smoke id -u)" != "0"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              echo "Final image health check passed."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs nakima-smoke
+          echo "::error::Container did not become healthy within 60 seconds."
+          exit 1
       - name: Build sandbox image
         uses: docker/build-push-action@v6
         with:

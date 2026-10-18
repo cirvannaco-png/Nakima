@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     GITHUB_MODELS_TOKEN: str | None = None
     GITHUB_MODELS_MODEL: str = "openai/gpt-4o-mini"
 
+    # Hugging Face private/protected OpenAI-compatible Inference Endpoint.
+    # Endpoint compute is billed by runtime/hardware; token caps below bound
+    # individual requests but do not replace provider-side billing alerts.
+    HUGGINGFACE_ENDPOINT_URL: str | None = None
+    HUGGINGFACE_API_TOKEN: str | None = None
+    HUGGINGFACE_MODEL: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
+    HUGGINGFACE_TIMEOUT_SECONDS: float = 45.0
+    HUGGINGFACE_MAX_PROMPT_CHARS: int = 24000
+    HUGGINGFACE_MAX_COMPLETION_TOKENS: int = 2048
+    # Explicit fallback provider, or empty string to fail closed.
+    HUGGINGFACE_FALLBACK_PROVIDER: str = "github"
+
     # Optional paid providers.
     ANTHROPIC_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
@@ -154,6 +166,16 @@ def preflight(s: "Settings | None" = None) -> list[str]:
             warnings.append(
                 "DEFAULT_AI_PROVIDER=github but neither GITHUB_MODELS_TOKEN "
                 "nor GITHUB_TOKEN is set — AI-backed features will be unavailable."
+            )
+    elif provider == "huggingface":
+        if not s.HUGGINGFACE_ENDPOINT_URL or not s.HUGGINGFACE_API_TOKEN:
+            warnings.append(
+                "DEFAULT_AI_PROVIDER=huggingface but HUGGINGFACE_ENDPOINT_URL "
+                "or HUGGINGFACE_API_TOKEN is missing — AI-backed features will be unavailable."
+            )
+        if s.HUGGINGFACE_FALLBACK_PROVIDER == "github" and not (s.GITHUB_MODELS_TOKEN or s.GITHUB_TOKEN):
+            warnings.append(
+                "HUGGINGFACE_FALLBACK_PROVIDER=github but no GitHub Models token is set; fallback requests will fail."
             )
     elif provider == "claude":
         if not s.ANTHROPIC_API_KEY:
