@@ -5,6 +5,7 @@ Inference Endpoints). Keep the endpoint private/protected and pin the model
 revision in the endpoint configuration. This provider never sends repository
 content to a public unauthenticated endpoint.
 """
+
 from typing import Any
 
 import httpx
@@ -55,9 +56,7 @@ class HuggingFaceEndpointProvider(AIProvider):
             if not self.api_token:
                 raise RuntimeError("HUGGINGFACE_API_TOKEN is not configured")
             if len(prompt) > self.max_prompt_chars:
-                raise ValueError(
-                    f"Prompt exceeds HUGGINGFACE_MAX_PROMPT_CHARS ({self.max_prompt_chars})"
-                )
+                raise ValueError(f"Prompt exceeds HUGGINGFACE_MAX_PROMPT_CHARS ({self.max_prompt_chars})")
 
             messages = []
             if system:
@@ -122,13 +121,23 @@ class HuggingFaceEndpointProvider(AIProvider):
 
     async def generate(self, prompt: str, context: dict[str, Any]) -> ProviderResponse:
         full_prompt = f"Generate code changes for: {prompt}\nContext: {context}"
-        return await self._call(full_prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192,
-                                fallback_method="generate", fallback_args=(prompt, context))
+        return await self._call(
+            full_prompt,
+            system=FILE_BLOCK_INSTRUCTIONS,
+            max_tokens=8192,
+            fallback_method="generate",
+            fallback_args=(prompt, context),
+        )
 
     async def debug(self, error: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Debug this error:\n{error}\nContext: {context}"
-        return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192,
-                                fallback_method="debug", fallback_args=(error, context))
+        return await self._call(
+            prompt,
+            system=FILE_BLOCK_INSTRUCTIONS,
+            max_tokens=8192,
+            fallback_method="debug",
+            fallback_args=(error, context),
+        )
 
     async def review(self, diff: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Review this diff for correctness, security, and regression risk. Cite exact evidence.\n{diff}\nContext: {context}"
@@ -136,8 +145,13 @@ class HuggingFaceEndpointProvider(AIProvider):
 
     async def refactor(self, code: str, instructions: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Refactor this code according to: {instructions}\nCode:\n{code}\nContext: {context}"
-        return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192,
-                                fallback_method="refactor", fallback_args=(code, instructions, context))
+        return await self._call(
+            prompt,
+            system=FILE_BLOCK_INSTRUCTIONS,
+            max_tokens=8192,
+            fallback_method="refactor",
+            fallback_args=(code, instructions, context),
+        )
 
     async def explain(self, code: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Explain this code in detail:\n{code}\nContext: {context}"
@@ -145,5 +159,10 @@ class HuggingFaceEndpointProvider(AIProvider):
 
     async def generate_tests(self, code: str, context: dict[str, Any]) -> ProviderResponse:
         prompt = f"Generate focused tests that fail on the described defect and pass on correct behavior:\n{code}\nContext: {context}"
-        return await self._call(prompt, system=FILE_BLOCK_INSTRUCTIONS, max_tokens=8192,
-                                fallback_method="generate_tests", fallback_args=(code, context))
+        return await self._call(
+            prompt,
+            system=FILE_BLOCK_INSTRUCTIONS,
+            max_tokens=8192,
+            fallback_method="generate_tests",
+            fallback_args=(code, context),
+        )
