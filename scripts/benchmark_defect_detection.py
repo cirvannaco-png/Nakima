@@ -18,6 +18,7 @@ script reports evidence-based location matches, false positives on clean control
 latency percentiles, and errors. It never treats model self-reported confidence as
 ground truth and never changes repositories or opens PRs.
 """
+
 import argparse
 import json
 import os
@@ -106,8 +107,9 @@ def main():
     errors = 0
     tp = fp = fn = 0
     clean_fp = 0
-    with httpx.Client(timeout=httpx.Timeout(args.timeout, connect=min(10, args.timeout)),
-                      follow_redirects=False) as client:
+    with httpx.Client(
+        timeout=httpx.Timeout(args.timeout, connect=min(10, args.timeout)), follow_redirects=False
+    ) as client:
         for case in cases:
             prompt = (
                 "Review this repository code for actionable defects only. "
@@ -123,8 +125,12 @@ def main():
                 response = client.post(
                     args.endpoint.rstrip("/") + "/v1/chat/completions",
                     headers={"Authorization": "Bearer " + args.token, "Content-Type": "application/json"},
-                    json={"model": args.model, "messages": [{"role": "user", "content": prompt}],
-                          "temperature": 0, "max_tokens": args.max_tokens},
+                    json={
+                        "model": args.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0,
+                        "max_tokens": args.max_tokens,
+                    },
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -138,13 +144,20 @@ def main():
                 fn += case_fn
                 if case.get("clean_control"):
                     clean_fp += len(predicted)
-                results.append({"case_id": case["case_id"], "status": "ok", "latency_ms": round(elapsed_ms, 2),
-                                "tp": case_tp, "fp": case_fp, "fn": case_fn,
-                                "predicted_count": len(predicted)})
+                results.append(
+                    {
+                        "case_id": case["case_id"],
+                        "status": "ok",
+                        "latency_ms": round(elapsed_ms, 2),
+                        "tp": case_tp,
+                        "fp": case_fp,
+                        "fn": case_fn,
+                        "predicted_count": len(predicted),
+                    }
+                )
             except Exception as exc:
                 errors += 1
-                results.append({"case_id": case.get("case_id"), "status": "error",
-                                "error_type": type(exc).__name__})
+                results.append({"case_id": case.get("case_id"), "status": "error", "error_type": type(exc).__name__})
 
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
