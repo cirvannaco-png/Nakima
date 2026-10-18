@@ -175,8 +175,7 @@ def preflight(s: "Settings | None" = None) -> list[str]:
             )
         if s.HUGGINGFACE_FALLBACK_PROVIDER == "github" and not (s.GITHUB_MODELS_TOKEN or s.GITHUB_TOKEN):
             warnings.append(
-                "HUGGINGFACE_FALLBACK_PROVIDER=github but no GitHub Models token is set; "
-                "fallback requests will fail."
+                "HUGGINGFACE_FALLBACK_PROVIDER=github but no GitHub Models token is set; fallback requests will fail."
             )
     elif provider == "claude":
         if not s.ANTHROPIC_API_KEY:
