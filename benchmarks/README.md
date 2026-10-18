@@ -3,8 +3,10 @@
 ## Candidate shortlist (not a ranking)
 
 1. `Qwen/Qwen2.5-Coder-7B-Instruct` — baseline candidate with an Apache-2.0 model card; suitable for initial endpoint sizing and controlled evaluation.
-2. `Qwen/Qwen2.5-Coder-32B-Instruct` — higher-capacity candidate; evaluate only if latency and hardware cost justify it.
-3. `Qwen/Qwen2.5-Coder-3B-Instruct` — lower-cost/latency candidate; verify defect recall carefully.
+2. `Qwen/Qwen2.5-Coder-14B-Instruct` — mid-sized candidate; compare quality gains against latency and hardware cost.
+3. `Qwen/Qwen2.5-Coder-32B-Instruct` — higher-capacity candidate; evaluate only if measured quality justifies the added runtime cost.
+
+All three model cards currently declare Apache-2.0. Pin the exact Hub revision used for every benchmark and deployment.
 
 Model card: https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct
 
