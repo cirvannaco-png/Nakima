@@ -21,6 +21,7 @@ def _tokens(text: str) -> list[str]:
         tokens.extend(part.lower() for part in re.split(r"[_\s]+", camel_split) if len(part) >= 3)
     return tokens
 
+
 def retrieve_code_evidence(
     repo_dir: Path,
     query: str,
