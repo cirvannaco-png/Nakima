@@ -21,7 +21,6 @@ ground truth and never changes repositories or opens PRs.
 import argparse
 import json
 import os
-import statistics
 import time
 from pathlib import Path
 
