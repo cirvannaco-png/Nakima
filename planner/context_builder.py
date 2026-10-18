@@ -3,9 +3,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repository.graph_query import GraphQuery
-
 from intelligence.retrieval import retrieve_code_evidence
+from repository.graph_query import GraphQuery
 
 
 class ContextBuilder:
