@@ -9,7 +9,7 @@ task_duration_seconds=Histogram('nakima_task_duration_seconds','Task duration se
 provider_call_duration_seconds=Histogram('nakima_provider_call_duration_seconds','Provider call seconds',['provider','action'],registry=REGISTRY)
 security_findings_total=Counter('nakima_security_findings_total','Security findings',['source','severity'],registry=REGISTRY)
 _LOGS=deque(maxlen=500); _LOCK=threading.Lock()
-_PATTERNS=((re.compile(r'(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s,;]+'),r'\\1[REDACTED]'),(re.compile(r'(?i)(token|api[_-]?key|secret|password)(\\s*[:=]\\s*)[\"\']?[^\\s,;\"\']+'),r'\\1\\2[REDACTED]'),(re.compile(r'\\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b'),'[REDACTED_GITHUB_TOKEN]'))
+_PATTERNS=((re.compile(r'(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+'),r'\1[REDACTED]'),(re.compile(r'(?i)(token|api[_-]?key|secret|password)(\s*[:=]\s*)[\"\']?[^\s,;\"\']+'),r'\1\2[REDACTED]'),(re.compile(r'\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b'),'[REDACTED_GITHUB_TOKEN]'))
 def redact_log_message(value:str)->str:
     for p,r in _PATTERNS:value=p.sub(r,value)
     return value[:4000]
