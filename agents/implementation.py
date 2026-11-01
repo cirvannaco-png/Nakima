@@ -24,6 +24,16 @@ class ImplementationAgent(BaseAgent):
 
         prompt = f"Implement the following plan:\n{plan}"
         if extra_context:
+            workspace_guidance = extra_context.get("workspace_guidance", "")
+            if workspace_guidance:
+                prompt += "\n\nApproved workspace guidance from the repository default branch:\n" + workspace_guidance
+            media_evidence = extra_context.get("media_evidence", [])
+            if media_evidence:
+                prompt += "\n\nAttached visual evidence (paths and captions; inspect image files where supported):\n"
+                prompt += "\n".join(
+                    "- " + str(item.get("filename", "attachment")) + ": " + str(item.get("caption") or "No caption") + " — " + str(item.get("path", ""))
+                    for item in media_evidence
+                )
             snippets = "\n\n".join(
                 f"### {s['file']}\n```\n{s['content']}\n```" for s in extra_context.get("code_snippets", [])
             )

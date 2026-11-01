@@ -1,119 +1,47 @@
-"""Nakima observability — Prometheus metrics + OpenTelemetry tracing.
-
-Metrics are exported via prometheus-client's built-in HTTP server and also
-available to the FastAPI process through the shared registry. The trace
-provider is configured once at import time so any module can acquire a
-tracer with `opentelemetry.trace.get_tracer(__name__)` without additional
-setup.
-
-Design choices:
-- A single `CollectorRegistry` instance (REGISTRY) is used everywhere so
-  metrics can be gathered in-process without starting a separate HTTP
-  server (useful in tests where starting a real server is impractical).
-- Tracing falls back gracefully: if the OTLP endpoint is not configured
-  (typical in development) spans are exported to stdout at DEBUG level via
-  ConsoleSpanExporter, never silently dropped.
-"""
-
+"""Prometheus metrics and a bounded, redacted in-process log buffer."""
 import logging
-import os
-
-from opentelemetry import trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+import re
+import threading
+from collections import deque
+from datetime import UTC, datetime
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Shared Prometheus registry
-# ---------------------------------------------------------------------------
-
 REGISTRY = CollectorRegistry(auto_describe=True)
-
-# Total webhook events received, labelled by event type and outcome.
-webhook_events_total = Counter(
-    "nakima_webhook_events_total",
-    "Total GitHub webhook events received by Nakima",
-    labelnames=["event_type", "outcome"],
-    registry=REGISTRY,
+webhook_events_total = Counter("nakima_webhook_events_total", "Webhook events handled", ["event_type", "outcome"], registry=REGISTRY)
+tasks_total = Counter("nakima_tasks_total", "Orchestration tasks", ["status"], registry=REGISTRY)
+task_duration_seconds = Histogram("nakima_task_duration_seconds", "Task duration in seconds", buckets=[30, 60, 120, 300, 600, 1200, 1800], registry=REGISTRY)
+provider_call_duration_seconds = Histogram("nakima_provider_call_duration_seconds", "Provider call duration in seconds", ["provider", "action"], registry=REGISTRY)
+security_findings_total = Counter("nakima_security_findings_total", "Security findings", ["source", "severity"], registry=REGISTRY)
+_LOGS: deque[dict] = deque(maxlen=500)
+_LOCK = threading.Lock()
+_PATTERNS = (
+    (re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(token|api[_-]?key|secret|password)(\s*[:=]\s*)[\"']?[^\s,;\"']+"), r"\1\2[REDACTED]"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"), "[REDACTED_GITHUB_TOKEN]"),
 )
 
-# Total orchestration tasks, labelled by final status (success/failed/pending).
-tasks_total = Counter(
-    "nakima_tasks_total",
-    "Total orchestration tasks created by Nakima",
-    labelnames=["status"],
-    registry=REGISTRY,
-)
+def redact_log_message(value: str) -> str:
+    for pattern, replacement in _PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value[:4000]
 
-# End-to-end task processing latency (seconds).
-task_duration_seconds = Histogram(
-    "nakima_task_duration_seconds",
-    "End-to-end latency for orchestration tasks (seconds)",
-    buckets=[30, 60, 120, 300, 600, 1200, 1800],
-    registry=REGISTRY,
-)
+class BoundedLogBuffer(logging.Handler):
+    """A bounded current-process log ring; no exception tracebacks are copied."""
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            item = {"timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(), "level": record.levelname, "logger": record.name[:120], "message": redact_log_message(record.getMessage())}
+            with _LOCK:
+                _LOGS.append(item)
+        except Exception:
+            self.handleError(record)
 
-# Sandbox execution latency (seconds).
-sandbox_run_duration_seconds = Histogram(
-    "nakima_sandbox_run_duration_seconds",
-    "Latency of sandbox container runs (seconds)",
-    labelnames=["stage"],
-    buckets=[5, 15, 30, 60, 120, 300],
-    registry=REGISTRY,
-)
+def install_log_buffer() -> None:
+    root = logging.getLogger()
+    if not any(isinstance(handler, BoundedLogBuffer) for handler in root.handlers):
+        handler = BoundedLogBuffer()
+        handler.setLevel(logging.INFO)
+        root.addHandler(handler)
 
-# AI provider call latency (seconds).
-provider_call_duration_seconds = Histogram(
-    "nakima_provider_call_duration_seconds",
-    "Latency of AI provider API calls (seconds)",
-    labelnames=["provider", "action"],
-    buckets=[1, 2, 5, 10, 30, 60],
-    registry=REGISTRY,
-)
-
-# NSIL security scan results.
-security_findings_total = Counter(
-    "nakima_security_findings_total",
-    "Total security findings detected by NSIL scanners",
-    labelnames=["source", "severity"],
-    registry=REGISTRY,
-)
-
-# ---------------------------------------------------------------------------
-# OpenTelemetry tracer provider
-# ---------------------------------------------------------------------------
-
-_SERVICE_NAME = "nakima"
-
-_resource = Resource.create({"service.name": _SERVICE_NAME})
-_provider = TracerProvider(resource=_resource)
-
-_otlp_endpoint = os.getenv("OTLP_ENDPOINT")
-if _otlp_endpoint:
-    try:
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import]
-
-        _provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=_otlp_endpoint)))
-        logger.info(f"OpenTelemetry: exporting traces to {_otlp_endpoint}")
-    except ImportError:
-        logger.warning(
-            "OTLP_ENDPOINT is set but opentelemetry-exporter-otlp-proto-grpc is not installed; "
-            "falling back to ConsoleSpanExporter"
-        )
-        _provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-else:
-    # Development / CI: print spans to stdout at DEBUG level so they're
-    # visible when LOG_LEVEL=DEBUG without polluting normal output.
-    _provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-
-trace.set_tracer_provider(_provider)
-
-
-# Convenience accessor — callers should use this rather than
-# opentelemetry.trace.get_tracer() directly so they get the right provider.
-def get_tracer(name: str = _SERVICE_NAME):
-    """Return a tracer scoped to `name` (use ``__name__`` at the call site)."""
-    return trace.get_tracer(name)
+def recent_logs(limit: int = 100) -> list[dict]:
+    with _LOCK:
+        return list(_LOGS)[-max(1, min(int(limit), 200)):]

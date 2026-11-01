@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,7 @@ class TaskResponse(BaseModel):
     error: str | None
     created_at: str
     updated_at: str | None
+    output_branch: str | None = None
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ def _task_to_response(task: Task, repo_full_name: str) -> dict:
     return {
         "id": str(task.id),
         "repo_full_name": repo_full_name,
-        "issue_number": payload.get("issue_number"),
+        "issue_number": payload.get("issue_number") or (payload.get("issue") or {}).get("number"),
         "title": task.title,
         "status": task.status.value,
         "pipeline_stage": _STAGE_MAP.get(task.status, "pending"),
@@ -58,6 +59,7 @@ def _task_to_response(task: Task, repo_full_name: str) -> dict:
         "error": task.error,
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+        "output_branch": payload.get("output_branch"),
     }
 
 
@@ -121,6 +123,53 @@ async def create_task(
         pass
 
     return _task_to_response(task, req.repo_full_name)
+
+
+class NaturalLanguageTaskRequest(BaseModel):
+    repo_full_name: str = Field(min_length=3, max_length=200)
+    title: str = Field(min_length=4, max_length=200)
+    description: str = Field(min_length=10, max_length=12000)
+    publish_pr: bool = True
+
+class RunNaturalLanguageTaskRequest(BaseModel):
+    github_token: SecretStr
+
+@router.post("/requests", response_model=TaskResponse, status_code=201)
+async def create_natural_language_request(req: NaturalLanguageTaskRequest, db: AsyncSession = Depends(get_db)):
+    """Create a natural-language change proposal; evidence can be uploaded before execution."""
+    if req.repo_full_name.count("/") != 1 or any(not part for part in req.repo_full_name.split("/")):
+        raise HTTPException(status_code=422, detail="repo_full_name must use owner/repository format")
+    repo = await _get_or_create_repo(db, req.repo_full_name)
+    payload = {
+        "issue": {"number": None, "title": req.title, "body": req.description},
+        "nakima": {"source": "natural_language", "publish_pr": req.publish_pr, "created_at": datetime.now(UTC).isoformat()},
+    }
+    task = Task(repository_id=repo.id, title=req.title, description=req.description, status=TaskStatus.PENDING, event_payload=payload)
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+    return _task_to_response(task, repo.full_name)
+
+@router.post("/{task_id}/run", response_model=TaskResponse)
+async def run_natural_language_request(task_id: uuid.UUID, req: RunNaturalLanguageTaskRequest, db: AsyncSession = Depends(get_db)):
+    """Start a pending natural-language proposal without persisting the GitHub token."""
+    result = await db.execute(select(Task, Repository.full_name).join(Repository, Task.repository_id == Repository.id).where(Task.id == task_id))
+    row = result.one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task, repo_full_name = row
+    payload = task.event_payload or {}
+    if (payload.get("nakima") or {}).get("source") != "natural_language":
+        raise HTTPException(status_code=400, detail="Only natural-language requests can be started here")
+    if task.status != TaskStatus.PENDING:
+        raise HTTPException(status_code=409, detail="The request is no longer pending")
+    token = req.github_token.get_secret_value().strip()
+    if not token:
+        raise HTTPException(status_code=422, detail="A GitHub token with repository write access is required")
+    import asyncio
+    from orchestrator.workflow import WorkflowOrchestrator
+    asyncio.create_task(WorkflowOrchestrator().process_task(str(task.id), repo_full_name, payload, token))
+    return _task_to_response(task, repo_full_name)
 
 
 @router.get("/", response_model=list[TaskResponse])

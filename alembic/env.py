@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from core.config import settings
 from database.base import Base
+from models.change_attachment import ChangeAttachment  # noqa: F401
 from models.document import ProjectDocument  # noqa: F401
 from models.graph import GraphEdge, GraphNode  # noqa: F401
 from models.intelligence.decision import EngineeringDecision, EngineeringEvent  # noqa: F401
