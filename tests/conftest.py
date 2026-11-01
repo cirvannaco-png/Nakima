@@ -14,6 +14,7 @@ os.environ.setdefault("DEFAULT_AI_PROVIDER", "github")
 @pytest.fixture
 async def db_session():
     from database.base import Base
+    from models.change_attachment import ChangeAttachment  # noqa: F401
     from models.document import ProjectDocument  # noqa: F401
     from models.graph import GraphEdge, GraphNode  # noqa: F401
     from models.intelligence.decision import EngineeringDecision, EngineeringEvent  # noqa: F401

@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     # Security
     SCAN_ON_PR: bool = True
     SECRET_DETECTION: bool = True
+    PRODUCTION_MONITORING_TOKEN: str | None = None
 
     # NEIS (neis/analyzers/tech_scout.py) — outbound calls to PyPI/npm to
     # check current upstream versions. Short timeout + low retry count on
