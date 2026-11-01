@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from api.v1.endpoints import documents, health, intelligence, market_research, neis, repositories, security, tasks
+from api.v1.endpoints import attachments, cicd, documents, health, intelligence, market_research, monitoring, neis, repositories, security, tasks
 
 router = APIRouter()
 router.include_router(health.router, prefix="/health", tags=["health"])
@@ -11,3 +11,7 @@ router.include_router(intelligence.router, prefix="/intelligence", tags=["intell
 router.include_router(security.router, prefix="/security", tags=["security"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
 router.include_router(market_research.router, prefix="/market-research", tags=["market-research"])
+
+router.include_router(attachments.router, prefix='/attachments', tags=['attachments'])
+router.include_router(cicd.router, prefix='/cicd/repositories', tags=['cicd'])
+router.include_router(monitoring.router, prefix='/monitoring', tags=['monitoring'])
