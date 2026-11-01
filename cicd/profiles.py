@@ -46,6 +46,5 @@ def render_github_actions(profile: CiProfile) -> str:
         "name: Nakima CI\n"
         "on:\n  pull_request:\n  push:\n    branches: ['" + profile.default_branch + "']\n"
         "permissions:\n  contents: read\n"
-        "jobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n"
-        + body + "\n"
+        "jobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n" + body + "\n"
     )
