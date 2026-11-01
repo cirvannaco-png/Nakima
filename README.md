@@ -461,3 +461,42 @@ Nakima is **proprietary software**. Source code is available for audit only.
 You may **not** copy, host, or redistribute it. See [LICENSE](LICENSE).
 
 The hosted GitHub App (once launched) is available under separate Terms of Service.
+
+
+## Change proposals, workspace memory, monitoring and personalized CI/CD
+
+Nakima accepts natural-language change requests for indexed repositories, keeps them pending while review evidence is attached, and then runs them through the existing planning, intent-drift, validation, security and quality gates.
+
+### Natural-language changes and visual evidence
+
+- POST /api/v1/tasks/requests creates a pending proposal with repository, title, description and optional PR publication preference.
+- POST /api/v1/attachments/{task_id} accepts PNG, JPEG, WEBP, MP4 and WEBM evidence with an optional caption. Content signatures are checked; SVG and unknown binary formats are rejected. Limits: 20 MiB per file, 40 MiB and 10 files per task.
+- GET /api/v1/attachments/{task_id} lists evidence metadata and SHA-256 digests.
+- POST /api/v1/tasks/{task_id}/run starts the proposal. Supply a GitHub token with repository write access in the request body; Nakima does not persist that token.
+- Images are embedded in the resulting pull-request description; video evidence is linked. Evidence is also committed under .nakima/attachments/ on the proposal branch. Review repository retention and media sensitivity before merging.
+
+### Approved workspace guidance
+
+Place durable team decisions in .nakima/workspace-guidance.md on the protected default branch. Nakima reads this file before creating a proposal branch and passes it to planning and implementation as guidance. It does not automatically promote model suggestions or unreviewed chat into team policy. Protect the default branch and require review for edits to this file.
+
+### Production monitoring
+
+- GET /api/v1/monitoring/metrics exposes Prometheus metrics.
+- GET /api/v1/monitoring/logs returns a bounded, redacted, current-process log buffer.
+- POST /api/v1/monitoring/investigations asks the configured AI provider for a read-only incident analysis based on those logs and metrics.
+- Set PRODUCTION_MONITORING_TOKEN in production and send it as X-Nakima-Monitoring-Token. Without it, monitoring endpoints return HTTP 503 in production; an incorrect token returns 401.
+
+The in-process log buffer is intentionally bounded and is not durable across restarts or multiple instances. Configure a hosted log and metrics backend plus exporter for historical, cross-instance investigations.
+
+### Personalized CI/CD
+
+- GET /api/v1/cicd/repositories/{owner}/{repo}/profile reads the repository profile.
+- PUT on the same path stores a profile in the existing repository policy JSON.
+- POST /api/v1/cicd/repositories/{owner}/{repo}/render renders a provider-specific validation pipeline for GitHub Actions, Gitea Actions, GitLab CI, Bitbucket Pipelines or generic Git.
+- Profiles include language/runtime versions, install, lint, build, test and security commands, branch filters, automatic recovery, and whether recovery fixes may be published.
+
+Pipeline rendering is preview-only: it does not commit files, run arbitrary commands, deploy, or bypass repository review. Deployment commands are deliberately excluded from generated validation workflows. The current code-change push and PR execution adapter remains GitHub-backed; non-GitHub providers receive pipeline rendering but need their own authenticated Git execution adapter before Nakima can create provider-native merge requests or push branches there.
+
+### Automatic recovery
+
+The existing validation loop can ask the debug agent to repair a failed validation and re-run the validation pipeline up to three times. A repository CI/CD profile can disable retries or allow a PR to be published after a recovery attempt. By default, recovered fixes are pushed to a proposal branch for review without automatically opening a PR. No automatic deployment is performed.

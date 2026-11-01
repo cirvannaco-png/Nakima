@@ -11,6 +11,7 @@ from api.v1.router import router as v1_router
 from core.config import PreflightError, preflight, settings
 from core.limiter import limiter
 from core.logging import setup_logging
+from monitoring import install_log_buffer
 from githubapp.app import router as github_router
 from githubapp.setup import router as github_setup_router
 
@@ -41,6 +42,7 @@ OPENAPI_TAGS = [
 
 def create_app() -> FastAPI:
     setup_logging()
+    install_log_buffer()
     log = logging.getLogger("nakima.startup")
     try:
         warnings = preflight()

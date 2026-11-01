@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 import uuid
 
 from github import Github  # PyGithub — safe now that our local package is githubapp, not github
@@ -13,6 +14,11 @@ from intelligence.decision_registry import DecisionRegistry
 from intelligence.event_log import EventLog
 from memory.knowledge_graph import KnowledgeGraphBuilder
 from memory.learning import OutcomeAnalyzer
+from memory.workspace_guidance import load_approved_workspace_guidance
+from monitoring import task_duration_seconds, tasks_total, webhook_events_total
+from models.policy import RepositoryPolicy
+from models.change_attachment import ChangeAttachment
+from models.policy import RepositoryPolicy
 from models.repository import Repository
 from models.task import Task, TaskStatus
 from neis.reasoning.arbitration_engine import DriftVerdict
@@ -107,6 +113,7 @@ def build_verification_summary(drift_result, nsil_result, quality_result) -> str
 
 class WorkflowOrchestrator:
     async def handle_webhook_event(self, event_type: str, payload: dict, repo_full_name: str, github_token: str):
+        webhook_events_total.labels(event_type=event_type, outcome="received").inc()
         repo = await self._ensure_repository(repo_full_name)
 
         if event_type == "issues" and payload.get("action") == "opened":
@@ -195,30 +202,51 @@ class WorkflowOrchestrator:
             logger.exception(f"Graph rebuild failed for {repo.full_name}")
 
     async def process_task(self, task_id: str, repo_full_name: str, issue_payload: dict, github_token: str):
+        started = time.perf_counter()
         async with AsyncSessionLocal() as session:
             task = await session.get(Task, uuid.UUID(task_id))
             if not task:
-                logger.error(f"Task {task_id} not found")
+                logger.error("Task %s not found", task_id)
                 return
             task.status = TaskStatus.IN_PROGRESS
             await session.commit()
-
+        tasks_total.labels(status="started").inc()
         try:
             await self._run_pipeline(task_id, repo_full_name, issue_payload, github_token)
-        except Exception as e:
-            logger.exception(f"Task {task_id} failed with an unhandled exception")
-            await self._fail_task(task_id, str(e))
+        except Exception as exc:
+            logger.exception("Task %s failed with an unhandled exception", task_id)
+            await self._fail_task(task_id, str(exc))
+        finally:
+            async with AsyncSessionLocal() as session:
+                task = await session.get(Task, uuid.UUID(task_id))
+                status = task.status.value if task else "missing"
+            tasks_total.labels(status=status).inc()
+            task_duration_seconds.observe(time.perf_counter() - started)
 
     async def _run_pipeline(self, task_id: str, repo_full_name: str, issue_payload: dict, github_token: str):
         issue = issue_payload["issue"]
+        issue_number = issue.get("number")
+        task_reference = f"issue #{issue_number}" if issue_number is not None else f"request {task_id[:8]}"
+        related_issues = [str(issue_number)] if issue_number is not None else []
+        nakima_options = issue_payload.get("nakima", {})
+        publish_pr_requested = bool(nakima_options.get("publish_pr", True))
         repo = await self._ensure_repository(repo_full_name)
+        async with AsyncSessionLocal() as profile_session:
+            policy_result = await profile_session.execute(select(RepositoryPolicy).where(RepositoryPolicy.repository_id == repo.id))
+            repository_policy = policy_result.scalar_one_or_none()
+            cicd_profile = ((repository_policy.additional_rules or {}).get("cicd_profile", {}) if repository_policy else {})
+        auto_recovery_enabled = bool(cicd_profile.get("auto_recovery", True))
+        publish_recovery_pr = bool(cicd_profile.get("publish_recovery_pr", False))
         repo_url = f"https://github.com/{repo_full_name}.git"
 
         # 1. Clone + branch (before planning, so the planner works from
         # real repo content instead of nothing)
         engine = RepositoryEngine(repo_url, github_token)
         await engine.clone()
-        branch = f"nakima/issue-{task_id[:8]}"
+        # Read approved team guidance from the default branch before creating the proposal branch.
+        approved_guidance = load_approved_workspace_guidance(engine.working_dir)
+        branch_kind = "issue" if issue_number is not None else "request"
+        branch = f"nakima/{branch_kind}-{task_id[:8]}"
         await engine.checkout_branch(branch)
 
         analyzer = RepositoryAnalyzer(engine.working_dir)
@@ -228,7 +256,11 @@ class WorkflowOrchestrator:
         planner = PlanningEngine()
         plan = await planner.create_plan(
             requirement=issue.get("body") or issue["title"],
-            repo_context={"repo": repo_full_name, "structure_summary": structure_summary},
+            repo_context={
+                "repo": repo_full_name,
+                "structure_summary": structure_summary,
+                "approved_workspace_guidance": approved_guidance,
+            },
         )
 
         # 3. Rebuild the code graph, then pull richer context (real code
@@ -244,6 +276,31 @@ class WorkflowOrchestrator:
                 affected_files=plan["affected_files"],
                 repo_dir=engine.working_dir,
             )
+            attachment_result = await session.execute(
+                select(ChangeAttachment).where(ChangeAttachment.task_id == uuid.UUID(task_id)).order_by(ChangeAttachment.created_at)
+            )
+            task_attachments = list(attachment_result.scalars().all())
+
+        enriched_context = dict(enriched_context or {})
+        enriched_context["workspace_guidance"] = approved_guidance
+        media_evidence = []
+        media_files = []
+        attachment_markdown = []
+        for attachment in task_attachments:
+            safe_name = Path(attachment.filename).name
+            relative_path = f".nakima/attachments/{str(attachment.id)[:8]}-{safe_name}"
+            destination = engine.working_dir / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(attachment.content)
+            media_files.append(relative_path)
+            media_evidence.append({"filename": attachment.filename, "caption": attachment.caption, "path": relative_path})
+            remote_url = f"https://raw.githubusercontent.com/{repo_full_name}/{branch}/{relative_path}"
+            label = attachment.caption or attachment.filename
+            if attachment.media_type.startswith("image/"):
+                attachment_markdown.append(f"![{label}]({remote_url})")
+            else:
+                attachment_markdown.append(f"- [Video evidence: {label}](https://github.com/{repo_full_name}/blob/{branch}/{relative_path})")
+        enriched_context["media_evidence"] = media_evidence
 
         # 3.5. Intent Drift Validation — NEIS's Decision Engine judges the
         # plan against the latest ProjectRealityModel and stated UserIntent
@@ -258,12 +315,12 @@ class WorkflowOrchestrator:
         async with AsyncSessionLocal() as session:
             drift_result = await DecisionEngine(session, repo.id).validate(proposed_change)
             await DecisionRegistry(session, repo.id).record(
-                context=f"Intent drift validation for issue #{issue['number']}: {issue['title']}",
+                context=f"Intent drift validation for {task_reference}: {issue['title']}",
                 problem=plan["requirement"],
                 decision=f"Verdict: {drift_result.verdict.value}",
                 justification="; ".join(drift_result.reasoning),
                 related_files=plan["affected_files"],
-                related_issues=[str(issue["number"])],
+                related_issues=related_issues,
             )
 
         if drift_result.verdict == DriftVerdict.BLOCK:
@@ -300,22 +357,24 @@ class WorkflowOrchestrator:
         if not impl_result.success:
             await self._fail_task(task_id, impl_result.error or "code generation failed")
             return
-        changed_files = impl_result.result["files_changed"]
+        changed_files = list(impl_result.result["files_changed"]) + media_files
 
         # 5. Validate, with graph-aware debug-and-retry on failure
         validation = ValidationPipeline()
         debug_agent = DebugAgent()
-        for attempt in range(MAX_VALIDATION_RETRIES + 1):
+        max_retries = MAX_VALIDATION_RETRIES if auto_recovery_enabled else 0
+        for attempt in range(max_retries + 1):
             validation_result = await validation.validate(engine.working_dir, language="python")
             if validation_result["success"]:
                 break
-            if attempt == MAX_VALIDATION_RETRIES:
+            if attempt == max_retries:
                 await self._fail_task(
                     task_id,
                     f"Validation failed after {MAX_VALIDATION_RETRIES} retries: {validation_result['failures']}",
                 )
                 return
 
+            recovery_attempts += 1
             async with AsyncSessionLocal() as session:
                 for failure in validation_result["failures"]:
                     debug_result = await debug_agent.execute(
@@ -365,7 +424,7 @@ class WorkflowOrchestrator:
                 engine.working_dir, include_agent_scanners=False
             )
             await DecisionRegistry(session, repo.id).record(
-                context=f"Security Gate for issue #{issue['number']}: {issue['title']}",
+                context=f"Security Gate for {task_reference}: {issue['title']}",
                 problem="Secret and configuration security scan of the working tree before push.",
                 decision=("Blocked" if security_gate_should_block(nsil_result) else "Approved"),
                 justification=(
@@ -375,7 +434,7 @@ class WorkflowOrchestrator:
                     f"{nsil_result.new_finding_count} new, {nsil_result.resolved_finding_count} resolved this scan."
                 ),
                 related_files=changed_files,
-                related_issues=[str(issue["number"])],
+                related_issues=related_issues,
             )
 
         if security_gate_should_block(nsil_result):
@@ -396,41 +455,50 @@ class WorkflowOrchestrator:
         quality_result = QualityGate().evaluate(changed_files)
         async with AsyncSessionLocal() as session:
             await DecisionRegistry(session, repo.id).record(
-                context=f"Quality Gate for issue #{issue['number']}: {issue['title']}",
+                context=f"Quality Gate for {task_reference}: {issue['title']}",
                 problem="Test-coverage-touch signal for the changed files.",
                 decision=quality_result.verdict.value,
                 justification="; ".join(quality_result.reasoning),
                 related_files=changed_files,
-                related_issues=[str(issue["number"])],
+                related_issues=related_issues,
             )
 
         # 7. Commit + push
         await engine.commit_changes(f"feat: {issue['title']}", changed_files)
         await engine.push_branch(branch)
 
-        # 8. Open PR
-        gh = Github(github_token)
-        gh_repo = gh.get_repo(repo_full_name)
-        pr = gh_repo.create_pull(
-            title=issue["title"],
-            body=f"Closes #{issue['number']}\n\nAutomated PR by Nakima.\n\n**Plan:**\n{plan['steps']}",
-            head=branch,
-            base=gh_repo.default_branch,
-        )
+        # 8. Publish the validated branch as a PR only when requested.
+        publish_pr = publish_pr_requested and (recovery_attempts == 0 or publish_recovery_pr)
+        pr = None
+        if publish_pr:
+            gh = Github(github_token)
+            gh_repo = gh.get_repo(repo_full_name)
+            issue_closure = f"Closes #{issue_number}\n\n" if issue_number is not None else ""
+            evidence_section = "\n\n**Attached evidence**\n" + "\n".join(attachment_markdown) if attachment_markdown else ""
+            recovery_section = f"\n\n**Automatic recovery attempts:** {recovery_attempts}"
+            pr_body = issue_closure + "Automated proposal by Nakima.\n\n**Plan:**\n" + str(plan["steps"]) + evidence_section + recovery_section
+            pr = gh_repo.create_pull(title=issue["title"], body=pr_body, head=branch, base=gh_repo.default_branch)
 
         async with AsyncSessionLocal() as session:
             task = await session.get(Task, uuid.UUID(task_id))
             task.status = TaskStatus.SUCCESS
-            task.pr_url = pr.html_url
+            task.pr_url = pr.html_url if pr else None
+            task.event_payload = {
+                **(task.event_payload or {}),
+                "output_branch": branch,
+                "publish_pr": publish_pr,
+                "recovery_attempts": recovery_attempts,
+            }
             await session.commit()
 
+            outcome = f"PR opened: {pr.html_url}" if pr else f"Validated branch pushed: {branch}"
             await DecisionRegistry(session, repo.id).record(
-                context=f"Verification Gate for issue #{issue['number']}: {issue['title']}",
-                problem="Final synthesis of Intent, Security, and Quality gate outcomes before PR open.",
-                decision=f"PR opened: {pr.html_url}",
+                context=f"Verification Gate for {task_reference}: {issue['title']}",
+                problem="Final synthesis of Intent, Security, and Quality gate outcomes before proposal publication.",
+                decision=outcome,
                 justification=build_verification_summary(drift_result, nsil_result, quality_result),
                 related_files=changed_files,
-                related_issues=[str(issue["number"])],
+                related_issues=related_issues,
             )
 
             await EventLog(session, repo.id).record(
@@ -439,12 +507,19 @@ class WorkflowOrchestrator:
                 reason=issue.get("body") or issue["title"],
                 chosen_solution=str(plan["steps"]),
                 files_modified=changed_files,
-                tests_executed=["format", "lint", "build", "test", "security", "security_gate", "quality_gate"],
+                tests_executed=[
+                    "format", "lint", "build", "test", "security", "security_gate",
+                    "quality_gate", f"automatic_recovery_attempts:{recovery_attempts}",
+                ],
                 risk_level="low" if len(changed_files) <= 3 else "medium",
                 verification_status="passed",
                 dependencies_affected=[],
             )
-        logger.info(f"Task {task_id}: PR created at {pr.html_url}")
+        logger.info(
+            "Task %s: %s",
+            task_id,
+            f"PR created at {pr.html_url}" if pr else f"validated branch pushed: {branch}",
+        )
 
     async def _fail_task(self, task_id: str, error: str):
         async with AsyncSessionLocal() as session:
