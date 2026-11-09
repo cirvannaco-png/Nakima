@@ -53,10 +53,12 @@ async def _get_or_create_installation(
 ) -> ProviderInstallation:
     external_id = _external_id(installation_payload.get("id"), "installation id")
     result = await session.execute(
-        select(ProviderInstallation).where(
+        select(ProviderInstallation)
+        .where(
             ProviderInstallation.provider == "github",
             ProviderInstallation.external_installation_id == external_id,
         )
+        .with_for_update()
     )
     installation = result.scalar_one_or_none()
 
@@ -179,10 +181,12 @@ async def sync_github_installation_event(
         installation = await _get_or_create_installation(session, installation_payload)
     else:
         result = await session.execute(
-            select(ProviderInstallation).where(
+            select(ProviderInstallation)
+            .where(
                 ProviderInstallation.provider == "github",
                 ProviderInstallation.external_installation_id == external_id,
             )
+            .with_for_update()
         )
         installation = result.scalar_one_or_none()
         if installation is None:
