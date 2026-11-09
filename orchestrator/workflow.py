@@ -18,8 +18,8 @@ from models.task import Task, TaskStatus
 from neis.reasoning.arbitration_engine import DriftVerdict
 from neis.reasoning.decision_engine import DecisionEngine
 from planner.context_builder import ContextBuilder
-from planner.token_compressor import TokenCompressor
 from planner.planner import PlanningEngine
+from planner.token_compressor import TokenCompressor
 from quality.gate import QualityGate
 from repository.analysis import RepositoryAnalyzer
 from repository.engine import RepositoryEngine
