@@ -2,7 +2,6 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -251,10 +250,12 @@ async def test_postgres_trigger_enforces_active_installation_and_synthetic_conse
             )
             session.add(repository)
             await session.commit()
+            repository_id = repository.id
+            installation_id = installation.id
 
             invalid = SandboxRun(
-                repository_id=repository.id,
-                provider_installation_id=installation.id,
+                repository_id=repository_id,
+                provider_installation_id=installation_id,
                 trigger="synthetic_injection",
                 source_commit_sha="2" * 40,
                 synthetic_injection_used=True,
@@ -263,6 +264,10 @@ async def test_postgres_trigger_enforces_active_installation_and_synthetic_conse
             with pytest.raises(DBAPIError):
                 await session.commit()
             await session.rollback()
+            repository = await session.get(Repository, repository_id)
+            installation = await session.get(ProviderInstallation, installation_id)
+            assert repository is not None
+            assert installation is not None
 
             repository.sandbox_lab_opt_in = True
             repository.sandbox_lab_consented_at = datetime.now(UTC).replace(tzinfo=None)
@@ -271,8 +276,8 @@ async def test_postgres_trigger_enforces_active_installation_and_synthetic_conse
             await session.commit()
 
             valid = SandboxRun(
-                repository_id=repository.id,
-                provider_installation_id=installation.id,
+                repository_id=repository_id,
+                provider_installation_id=installation_id,
                 trigger="synthetic_injection",
                 source_commit_sha="3" * 40,
                 synthetic_injection_used=True,
