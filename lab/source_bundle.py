@@ -69,7 +69,12 @@ def _validate_token(token: str) -> str:
     return token
 
 
-def _trusted_archive_redirect(location: str) -> str:
+def _trusted_archive_redirect(
+    location: str,
+    owner: str,
+    repository: str,
+    commit_sha: str,
+) -> str:
     parsed = urlparse(location)
     try:
         port = parsed.port
@@ -83,7 +88,8 @@ def _trusted_archive_redirect(location: str) -> str:
         or port not in (None, 443)
         or parsed.query
         or parsed.fragment
-        or not parsed.path.startswith("/")
+        or not parsed.path.startswith(f"/{owner}/{repository}/")
+        or commit_sha not in parsed.path.split("/")
     ):
         raise SourceBundleError("GitHub returned an untrusted archive redirect")
     return location
@@ -187,7 +193,7 @@ async def fetch_pinned_github_bundle(
                     location = response.headers.get("location")
                     if not location:
                         raise SourceBundleError("GitHub archive redirect did not include a location")
-                    trusted_location = _trusted_archive_redirect(location)
+                    trusted_location = _trusted_archive_redirect(location, owner, repository, commit_sha)
                 elif response.status_code == 200:
                     response.raise_for_status()
                     digest = hashlib.sha256()
@@ -262,6 +268,9 @@ def extract_verified_source_bundle(
     """
     archive_path = Path(bundle.archive_path)
     destination = Path(destination)
+    _validate_commit_sha(bundle.commit_sha)
+    if not re.fullmatch(r"[0-9a-f]{64}", bundle.archive_sha256):
+        raise SourceBundleError("Source archive manifest contains an invalid SHA-256 digest")
     if not archive_path.is_file():
         raise SourceBundleError("Source archive is missing")
     if _sha256_file(archive_path) != bundle.archive_sha256:
