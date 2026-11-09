@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.provider_installation import ProviderInstallation
+from models.provider_installation_membership import ProviderInstallationMembership
 from models.repository import Repository
 
 
@@ -203,6 +204,21 @@ async def sync_github_installation_event(
                 _clear_lab_consent(repository)
                 if action == "deleted":
                     repository.provider_installation_id = None
+
+            if action == "deleted":
+                membership_result = await session.execute(
+                    select(ProviderInstallationMembership).where(
+                        ProviderInstallationMembership.provider_installation_id == installation.id,
+                        ProviderInstallationMembership.is_active.is_(True),
+                    )
+                )
+                revoked_at = _now_utc_naive()
+                for membership in membership_result.scalars():
+                    membership.is_active = False
+                    membership.revoked_by_issuer = "urn:nakima:system"
+                    membership.revoked_by_subject = "github-installation-deleted"
+                    membership.revoked_at = revoked_at
+                    membership.updated_at = revoked_at
 
         repository_items = payload.get("repositories") or []
         added = 0
