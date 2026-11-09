@@ -31,8 +31,7 @@ class SandboxRun(Base):
             name="ck_sandbox_runs_status",
         ),
         CheckConstraint(
-            "outcome IS NULL OR outcome IN "
-            "('fix_correct', 'fix_incorrect', 'no_fix_found', 'user_rejected')",
+            "outcome IS NULL OR outcome IN ('fix_correct', 'fix_incorrect', 'no_fix_found', 'user_rejected')",
             name="ck_sandbox_runs_outcome",
         ),
         CheckConstraint(
@@ -58,7 +57,9 @@ class SandboxRun(Base):
     container_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     container_image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    synthetic_injection_used: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     result_schema_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     diagnosis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     proposed_fix_diff: Mapped[str | None] = mapped_column(Text, nullable=True)
