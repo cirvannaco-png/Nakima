@@ -149,6 +149,15 @@ jobs:
           tags: nakima-sandbox:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Build isolated Lab runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.lab
+          push: false
+          tags: nakima-lab-runner:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # --- Container vulnerability scan (Trivy) ---
   # Scans both shipped images for OS + library CVEs. Findings are uploaded to
@@ -169,9 +178,11 @@ jobs:
             blocking: "true"
           - name: sandbox
             dockerfile: Dockerfile.sandbox
-            # The sandbox image intentionally carries a wider toolchain; its
-            # CVEs are reported to code scanning but do not block the pipeline.
+            # The general SandboxExecutor image intentionally carries a wider toolchain.
             blocking: "false"
+          - name: lab-runner
+            dockerfile: Dockerfile.lab
+            blocking: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -242,6 +253,15 @@ jobs:
         with:
           scan-type: "config"
           scan-ref: "Dockerfile"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      - name: Scan Lab runner Dockerfile (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: "config"
+          scan-ref: "Dockerfile.lab"
           format: "table"
           exit-code: "1"
           severity: "CRITICAL,HIGH"
