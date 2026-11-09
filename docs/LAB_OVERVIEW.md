@@ -71,15 +71,16 @@ chain and is explicitly marked deprecated and non-executable. Do not apply it.
   However, this app is still a separate unmounted service, and end-to-end
   authentication/authorization has not been validated against a selected
   production identity provider.
-- `orchestrator/main.py` also uses an in-memory run registry and contains
-  unimplemented consent, clone-resolution, result-polling, and persistence
-  functions. Its request contract does not yet use the canonical integer
-  repository key.
+- The Lab API now uses `repositories.id` (integer), reads durable run/review
+  rows, and authorizes those operations against active installation
+  memberships. Run creation intentionally returns 503: there is no complete
+  runner lifecycle yet, so no run is falsely marked queued or accepted.
 - The installation webhook adapter is GitHub-specific (as intended for the
   current integration). The generic installation model is provider-neutral,
   but other providers still need their own webhook/sync adapters. Normal
-  issue/push/PR events also still need to be bound to the stored installation
-  row before any workflow token is minted.
+  GitHub issue/push/PR events now require a synchronized active installation
+  and exact repository-ID ownership before the workflow-token request. The
+  separate workflow token itself remains unscoped until PR #95 is integrated.
 - The sandbox container is launched with `network_mode="none"`, while the
   current entrypoint attempts to clone from GitHub inside the container.
   Those requirements contradict each other. Host-side clone and immutable
