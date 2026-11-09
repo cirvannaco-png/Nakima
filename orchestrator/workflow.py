@@ -19,6 +19,7 @@ from neis.reasoning.arbitration_engine import DriftVerdict
 from neis.reasoning.decision_engine import DecisionEngine
 from planner.context_builder import ContextBuilder
 from planner.planner import PlanningEngine
+from planner.token_compressor import TokenCompressor
 from quality.gate import QualityGate
 from repository.analysis import RepositoryAnalyzer
 from repository.engine import RepositoryEngine
@@ -244,6 +245,10 @@ class WorkflowOrchestrator:
                 affected_files=plan["affected_files"],
                 repo_dir=engine.working_dir,
             )
+
+            # Compress the graph-enriched context before it reaches the implementation provider.
+            # This is the actual planner-to-implementation execution path, not a standalone utility.
+            enriched_context = TokenCompressor().compress(enriched_context)
 
         # 3.5. Intent Drift Validation — NEIS's Decision Engine judges the
         # plan against the latest ProjectRealityModel and stated UserIntent
