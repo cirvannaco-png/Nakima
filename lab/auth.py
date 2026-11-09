@@ -98,6 +98,10 @@ class OIDCVerifier:
             raise LabIdentityProviderUnavailable("Could not retrieve OIDC signing keys") from exc
         if not isinstance(document, dict) or not isinstance(document.get("keys"), list) or not document["keys"]:
             raise LabIdentityProviderUnavailable("OIDC JWKS document is malformed")
+        try:
+            jwt.PyJWKSet.from_dict(document)
+        except jwt.PyJWTError as exc:
+            raise LabIdentityProviderUnavailable("OIDC JWKS signing keys are malformed") from exc
         return document
 
     async def _get_jwks(self, jwks_url: str, force_refresh: bool = False) -> dict:
@@ -166,6 +170,9 @@ class OIDCVerifier:
             raise InvalidLabToken("OIDC subject is invalid")
         if claim_issuer != issuer:
             raise InvalidLabToken("OIDC issuer mismatch")
+        token_audience = claims.get("aud")
+        if isinstance(token_audience, list) and len(token_audience) > 1 and claims.get("azp") != audience:
+            raise InvalidLabToken("OIDC authorized-party claim does not match the Lab audience")
         return LabPrincipal(issuer=issuer, subject=subject)
 
 
