@@ -85,7 +85,7 @@ GitHub Issue
 | **Quality Gate** | Blocks PRs when source changes have no accompanying test changes |
 | **Evolution review gate** | Roadmap recommendations stay proposals until a human accepts or dismisses them; accepting can open the GitHub issue |
 | **Market research (optional)** | Research → Judge → Opportunity pipeline turns external signals into proposals; disabled until a search backend is configured, and nothing it produces reaches the roadmap without an explicit promotion call |
-| **Sandbox lab & self-healing** | Ephemeral, network-isolated container reproduces a failure, generates bounded multi-model candidate fixes, validates each against the full suite, and routes the result to human review |
+| **Sandbox lab & self-healing (in development)** | Partial scaffold only. Canonical tenant/consent persistence is being added; isolated cloning, durable runs, provider-backed diagnosis, candidate patch validation, and end-to-end security evidence are not complete. Not ready for live repositories |
 | **Token budget compression** | Trims planner context to a token budget, keeping high fan-in files so large repos stay within provider limits |
 | **Virus scanning** | ClamAV integration for uploaded documents |
 | **Command Centre** | Real-time dashboard at `/` |
