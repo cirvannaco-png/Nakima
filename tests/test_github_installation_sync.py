@@ -179,6 +179,7 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert repository.provider_installation_id is None
     assert repository.sandbox_lab_opt_in is False
     assert membership.is_active is False
+    assert membership.revocation_reason == "installation_deleted"
     assert membership.revoked_at is not None
     assert membership.revoked_by_issuer == "urn:nakima:system"
 
