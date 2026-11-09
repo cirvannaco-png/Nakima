@@ -9,7 +9,10 @@ real vs. stubbed right now.
 
 - Migration `0013` adds a provider-neutral `provider_installations` table and links the existing integer-keyed `repositories` rows to an internal installation ID. External provider IDs are stored as strings and uniquely scoped by provider.
 - Legacy repositories remain unattached and Lab-opted-out. A database CHECK constraint requires an installation, consent timestamp, actor identifier, and consent version before opt-in.
-- This does not create `sandbox_runs` or `run_reviews`, and it does not yet connect verified webhook metadata to provider-installation rows. Those are still required before a run can be authorized or persisted.
+- Migration `0014` now defines `sandbox_runs`, `run_reviews`, and
+  `model_candidate_fixes` against the canonical integer repository ID.
+  These tables are not yet wired into the orchestrator, and verified webhook
+  metadata is not yet upserted into provider-installation rows.
 - `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
 
 ## Stubbed, needs implementation before first live test
@@ -22,7 +25,8 @@ real vs. stubbed right now.
   Never pass the workflow token or an org-wide PAT to the sandbox.
 - `orchestrator/main.py::_await_container_completion` — needs real container
   log polling + a defined structured JSON contract the sandbox entrypoint
-  writes before exit (schema TBD, should live in `sandbox_image/`).
+  writes before exit. The database now has a `result_schema_version` field,
+  but the Pydantic result contract and persistence path are still missing.
 - `orchestrator/self_healing.py::diagnose_failure` and
   `generate_candidate_fix` — need real model API wiring. Structured output
   schemas need to be nailed down and tested against real CI logs from Nakima
