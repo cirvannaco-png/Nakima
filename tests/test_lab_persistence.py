@@ -9,6 +9,7 @@ from models.lab import ModelCandidateFix, RunReview, SandboxRun
 from models.provider_installation import ProviderInstallation
 from models.repository import Repository
 
+
 @pytest.mark.asyncio
 async def test_lab_run_review_and_candidate_records_use_canonical_repository(db_session):
     installation = ProviderInstallation(provider="github", external_installation_id="lab-target-install")
@@ -67,6 +68,7 @@ async def test_lab_run_review_and_candidate_records_use_canonical_repository(db_
     assert stored_review is not None
     assert stored_review.decision == "approved"
 
+
 @pytest.mark.asyncio
 async def test_candidate_cannot_be_selected_without_passing_test_evidence(db_session):
     installation = ProviderInstallation(provider="github", external_installation_id="candidate-gate-install")
@@ -97,6 +99,7 @@ async def test_candidate_cannot_be_selected_without_passing_test_evidence(db_ses
         await db_session.commit()
     await db_session.rollback()
 
+
 @pytest.mark.asyncio
 async def test_synthetic_injection_requires_matching_run_trigger(db_session):
     installation = ProviderInstallation(provider="github", external_installation_id="synthetic-gate-install")
@@ -117,6 +120,7 @@ async def test_synthetic_injection_requires_matching_run_trigger(db_session):
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
+
 
 @pytest.mark.asyncio
 async def test_run_tenant_snapshot_survives_repository_detachment(db_session):
@@ -150,6 +154,7 @@ async def test_run_tenant_snapshot_survives_repository_detachment(db_session):
     assert stored_run.repository_id == repository.id
     assert stored_run.provider_installation_id == installation.id
     assert stored_run.repository.provider_installation_id is None
+
 
 @pytest.mark.asyncio
 async def test_only_one_candidate_can_be_selected_for_a_run(db_session):
@@ -188,6 +193,7 @@ async def test_only_one_candidate_can_be_selected_for_a_run(db_session):
         await db_session.commit()
     await db_session.rollback()
 
+
 @pytest.mark.asyncio
 async def test_tested_candidate_requires_commit_and_full_test_evidence(db_session):
     installation = ProviderInstallation(provider="github", external_installation_id="tested-evidence-install")
@@ -218,6 +224,7 @@ async def test_tested_candidate_requires_commit_and_full_test_evidence(db_sessio
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
+
 
 @pytest.mark.asyncio
 async def test_postgres_trigger_enforces_active_installation_and_synthetic_consent():
@@ -300,7 +307,6 @@ async def test_postgres_trigger_enforces_active_installation_and_synthetic_conse
             assert stored.provider_installation_id == installation.id
     finally:
         await engine.dispose()
-
 
 
 @pytest.mark.asyncio
