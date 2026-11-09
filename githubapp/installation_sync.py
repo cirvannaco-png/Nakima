@@ -162,10 +162,32 @@ async def sync_github_installation_event(
     if not isinstance(installation_payload, dict):
         raise ValueError("Webhook payload is missing its installation object")
 
-    installation = await _get_or_create_installation(session, installation_payload)
     action = payload.get("action")
     if not isinstance(action, str):
         raise ValueError("Webhook payload is missing its installation action")
+
+    installation_actions = {"created", "unsuspend", "new_permissions_accepted", "suspend", "deleted"}
+    repository_actions = {"added", "removed"}
+    if event_type == "installation" and action not in installation_actions:
+        return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
+    if event_type == "installation_repositories" and action not in repository_actions:
+        return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
+
+    if event_type == "installation_repositories" and action == "removed":
+        external_id = _external_id(installation_payload.get("id"), "installation id")
+        result = await session.execute(
+            select(ProviderInstallation).where(
+                ProviderInstallation.provider == "github",
+                ProviderInstallation.external_installation_id == external_id,
+            )
+        )
+        installation = result.scalar_one_or_none()
+        if installation is None:
+            # Out-of-order removal events must not manufacture an active
+            # installation/tenant that was never registered locally.
+            return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
+    else:
+        installation = await _get_or_create_installation(session, installation_payload)
 
     if event_type == "installation":
         if action in {"created", "unsuspend", "new_permissions_accepted"}:
@@ -181,8 +203,6 @@ async def sync_github_installation_event(
                 _clear_lab_consent(repository)
                 if action == "deleted":
                     repository.provider_installation_id = None
-        else:
-            return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
 
         repository_items = payload.get("repositories") or []
         added = 0
@@ -197,11 +217,8 @@ async def sync_github_installation_event(
             await _upsert_repository(session, installation, item)
         return {"status": "synced", "action": action, "repositories_added": len(items), "repositories_removed": 0}
 
-    if action == "removed":
-        items = payload.get("repositories_removed") or []
-        removed = 0
-        for item in items:
-            removed += int(await _remove_repository(session, installation, item))
-        return {"status": "synced", "action": action, "repositories_added": 0, "repositories_removed": removed}
-
-    return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
+    items = payload.get("repositories_removed") or []
+    removed = 0
+    for item in items:
+        removed += int(await _remove_repository(session, installation, item))
+    return {"status": "synced", "action": action, "repositories_added": 0, "repositories_removed": removed}
