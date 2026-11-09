@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.provider_installation import ProviderInstallation
+from models.provider_installation_membership import ProviderInstallationMembership
 from models.repository import Repository
 
 
@@ -52,10 +53,12 @@ async def _get_or_create_installation(
 ) -> ProviderInstallation:
     external_id = _external_id(installation_payload.get("id"), "installation id")
     result = await session.execute(
-        select(ProviderInstallation).where(
+        select(ProviderInstallation)
+        .where(
             ProviderInstallation.provider == "github",
             ProviderInstallation.external_installation_id == external_id,
         )
+        .with_for_update()
     )
     installation = result.scalar_one_or_none()
 
@@ -173,21 +176,25 @@ async def sync_github_installation_event(
     if event_type == "installation_repositories" and action not in repository_actions:
         return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
 
-    if event_type == "installation_repositories" and action == "removed":
-        external_id = _external_id(installation_payload.get("id"), "installation id")
+    external_id = _external_id(installation_payload.get("id"), "installation id")
+    if event_type == "installation" and action == "created":
+        installation = await _get_or_create_installation(session, installation_payload)
+    else:
         result = await session.execute(
-            select(ProviderInstallation).where(
+            select(ProviderInstallation)
+            .where(
                 ProviderInstallation.provider == "github",
                 ProviderInstallation.external_installation_id == external_id,
             )
+            .with_for_update()
         )
         installation = result.scalar_one_or_none()
         if installation is None:
-            # Out-of-order removal events must not manufacture an active
-            # installation/tenant that was never registered locally.
+            # Only the signed installation.created event may create a tenant.
+            # Out-of-order repository or lifecycle events never manufacture one.
             return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
-    else:
-        installation = await _get_or_create_installation(session, installation_payload)
+        if event_type == "installation_repositories" and action == "added" and not installation.is_active:
+            return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
 
     if event_type == "installation":
         if action in {"created", "unsuspend", "new_permissions_accepted"}:
@@ -204,11 +211,28 @@ async def sync_github_installation_event(
                 if action == "deleted":
                     repository.provider_installation_id = None
 
+            if action == "deleted":
+                membership_result = await session.execute(
+                    select(ProviderInstallationMembership).where(
+                        ProviderInstallationMembership.provider_installation_id == installation.id,
+                        ProviderInstallationMembership.is_active.is_(True),
+                    )
+                )
+                revoked_at = datetime.now(UTC)
+                for membership in membership_result.scalars():
+                    membership.is_active = False
+                    membership.revoked_by_issuer = "urn:nakima:system"
+                    membership.revoked_by_subject = "github-installation-deleted"
+                    membership.revocation_reason = "installation_deleted"
+                    membership.revoked_at = revoked_at
+                    membership.updated_at = revoked_at
+
         repository_items = payload.get("repositories") or []
         added = 0
-        for item in repository_items:
-            await _upsert_repository(session, installation, item)
-            added += 1
+        if action in {"created", "unsuspend", "new_permissions_accepted"} and installation.is_active:
+            for item in repository_items:
+                await _upsert_repository(session, installation, item)
+                added += 1
         return {"status": "synced", "action": action, "repositories_added": added, "repositories_removed": 0}
 
     if action == "added":

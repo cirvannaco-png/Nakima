@@ -1,45 +1,39 @@
-"""
-Nakima Lab — Sandbox Orchestrator
-==================================
+"""Nakima Lab API.
 
-Design stance (per Cardinal Rule): single-process FastAPI service, no
-Kubernetes, no message queue beyond Postgres-backed job state. Isolation is
-achieved via ephemeral Docker containers with no network access to
-production infra — this is a SECURITY requirement, not a scale one, so it
-does not trip the "unjustified complexity" check. If/when concurrent sandbox
-runs exceed what one host can schedule, the justified next step is a job
-queue (e.g. a `jobs` table polled by workers, NOT Kafka) — not before.
-
-Flow enforced by this service:
-  1. Clone target repo read-only into an ephemeral container (network: none)
-  2. Run CVE scan / synthetic injection (only if repo opted in) / self-heal loop
-  3. Persist diagnosis + proposed diff to sandbox_runs (tenant-isolated table)
-  4. Never touch the live repo. Never auto-merge. Never auto-push.
-  5. On container exit (success, failure, or TTL expiry) — destroy it. No
-     container outlives its run. No state persists in the container itself;
-     everything durable goes to Postgres.
+This service is deliberately not mounted by the production app. The API
+requires OIDC authentication and installation-scoped authorization. Execution
+remains disabled until the host-side clone, immutable archive transfer,
+network-isolated runner, result contract, and durable lifecycle are complete.
 """
 
 from __future__ import annotations
 
-import asyncio
-import logging
 import uuid
-from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from typing import Literal
 
-import docker
-from fastapi import BackgroundTasks, FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, status
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger("nakima.lab.orchestrator")
+from database.session import get_db
+from lab.auth import LabPrincipal, get_current_lab_principal
+from lab.authorization import (
+    READ_ROLES,
+    REVIEW_ROLES,
+    RUN_ROLES,
+    grant_installation_membership,
+    is_lab_operator,
+    require_installation_role,
+    revoke_installation_membership,
+)
+from models.lab import RunReview, SandboxRun
+from models.provider_installation import ProviderInstallation
+from models.provider_installation_membership import ProviderInstallationMembership
+from models.repository import Repository
 
-app = FastAPI(title="Nakima Lab Orchestrator", version="0.1.0")
-docker_client = docker.from_env()
-
-SANDBOX_IMAGE = "nakima-sandbox-runner:latest"
-CONTAINER_TTL_SECONDS = 60 * 60 * 2  # hard ceiling; runs must finish or die within 2h
-MAX_CONCURRENT_RUNS = 4  # matches a single-host budget; revisit only with real concurrency data
+app = FastAPI(title="Nakima Lab Orchestrator", version="0.2.0")
 
 
 class RunTrigger(StrEnum):
@@ -50,11 +44,25 @@ class RunTrigger(StrEnum):
 
 
 class SandboxRunRequest(BaseModel):
-    organization_id: uuid.UUID
-    repository_id: uuid.UUID
-    source_commit_sha: str
+    model_config = ConfigDict(extra="forbid")
+
+    # Use Nakima's canonical integer repository key. The former caller-
+    # supplied UUID repository/organization pair belonged to the abandoned
+    # second schema and could not be resolved against the application DB.
+    repository_id: int = Field(gt=0)
+    source_commit_sha: str = Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
     trigger: RunTrigger
     request_synthetic_injection: bool = False
+
+    @model_validator(mode="after")
+    def validate_synthetic_request(self):
+        is_synthetic = self.trigger == RunTrigger.synthetic_injection
+        if is_synthetic != self.request_synthetic_injection:
+            raise ValueError(
+                "synthetic injection requires trigger='synthetic_injection' "
+                "and explicit request_synthetic_injection=true"
+            )
+        return self
 
 
 class SandboxRunHandle(BaseModel):
@@ -63,195 +71,207 @@ class SandboxRunHandle(BaseModel):
     container_id: str | None = None
 
 
-# In production this is a DB-backed table (sandbox_runs); kept as an
-# in-memory stub here so the orchestrator logic is reviewable standalone.
-_ACTIVE_RUNS: dict[str, dict] = {}
+class RunReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["approved", "rejected"]
+    notes: str = Field(default="", max_length=4000)
 
 
-async def _repo_has_lab_consent(repository_id: uuid.UUID) -> bool:
-    """
-    Must check `repositories.sandbox_lab_opt_in` before permitting synthetic
-    vulnerability injection. This mirrors the DB trigger in schema.sql as a
-    defense-in-depth check at the application layer — the DB constraint is
-    the real enforcement point, this is the fast-fail.
-    """
-    # TODO: replace with real DB call
-    raise NotImplementedError("wire to repositories table")
+class MembershipGrantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str = Field(min_length=1, max_length=255)
+    role: Literal["owner", "admin", "maintainer", "reviewer", "viewer"]
 
 
-def _launch_isolated_container(
-    run_id: str, repo_clone_url: str, commit_sha: str, trigger: str, synthetic_injection_verified: bool
-) -> str:
-    """
-    Launches a fully network-isolated container to run the sandbox.
+class MembershipResponse(BaseModel):
+    membership_id: int
+    provider_installation_id: int
+    subject: str
+    role: str
+    is_active: bool
+    granted_by: str
+    revoked_at: str | None = None
 
-    Isolation guarantees enforced here:
-      - network_mode="none": no egress, no ingress, cannot reach prod infra,
-        cannot reach the public internet either (dependency mirrors must be
-        pre-baked into the sandbox image, not fetched at runtime)
-      - read_only root filesystem except a scoped /workspace tmpfs
-      - no volume mounts to host paths that touch live deploy credentials
-      - resource limits to prevent one run from starving the host
-    """
-    container = docker_client.containers.run(
-        image=SANDBOX_IMAGE,
-        name=f"nakima-sandbox-{run_id}",
-        detach=True,
-        network_mode="none",
-        read_only=True,
-        tmpfs={"/workspace": "size=2g,exec"},
-        mem_limit="2g",
-        nano_cpus=2_000_000_000,  # 2 CPUs
-        environment={
-            "REPO_CLONE_URL": repo_clone_url,
-            "COMMIT_SHA": commit_sha,
-            "RUN_ID": run_id,
-            "TRIGGER": trigger,
-            # Set to "true" ONLY after this process has independently verified
-            # repositories.sandbox_lab_opt_in == true — see _repo_has_lab_consent.
-            # This is defense-in-depth layer #2 (DB trigger in schema.sql is #1,
-            # entrypoint.py's own re-check is #3). Never set this based on the
-            # request payload alone.
-            "SYNTHETIC_INJECTION_CONSENT_VERIFIED": "true" if synthetic_injection_verified else "false",
-        },
-        labels={
-            "nakima.run_id": run_id,
-            "nakima.component": "sandbox",
-            "nakima.ttl_seconds": str(CONTAINER_TTL_SECONDS),
-        },
-        auto_remove=False,  # we remove explicitly after log/result capture
+
+def _membership_response(membership: ProviderInstallationMembership) -> MembershipResponse:
+    return MembershipResponse(
+        membership_id=membership.id,
+        provider_installation_id=membership.provider_installation_id,
+        subject=membership.principal_subject,
+        role=membership.role,
+        is_active=membership.is_active,
+        granted_by=f"{membership.granted_by_issuer}|{membership.granted_by_subject}",
+        revoked_at=membership.revoked_at.isoformat() if membership.revoked_at else None,
     )
-    return container.id
 
 
-@app.post("/lab/runs", response_model=SandboxRunHandle, status_code=202)
-async def create_sandbox_run(req: SandboxRunRequest, background_tasks: BackgroundTasks):
-    if req.request_synthetic_injection:
-        if req.trigger != RunTrigger.synthetic_injection:
-            raise HTTPException(400, "request_synthetic_injection requires trigger='synthetic_injection'")
-        allowed = await _repo_has_lab_consent(req.repository_id)
-        if not allowed:
-            raise HTTPException(
-                403,
-                "This repository has not opted into synthetic vulnerability injection. "
-                "Enable it explicitly in repo settings before requesting this run type.",
-            )
-
-    running = sum(1 for r in _ACTIVE_RUNS.values() if r["status"] in ("provisioning", "running"))
-    if running >= MAX_CONCURRENT_RUNS:
-        raise HTTPException(429, f"At capacity ({MAX_CONCURRENT_RUNS} concurrent sandbox runs). Try again shortly.")
-
-    run_id = str(uuid.uuid4())
-    _ACTIVE_RUNS[run_id] = {
-        "status": "provisioning",
-        "organization_id": str(req.organization_id),
-        "repository_id": str(req.repository_id),
-        "created_at": datetime.now(UTC),
-        "expires_at": datetime.now(UTC) + timedelta(seconds=CONTAINER_TTL_SECONDS),
-    }
-
-    background_tasks.add_task(_run_sandbox_lifecycle, run_id, req)
-    return SandboxRunHandle(run_id=uuid.UUID(run_id), status="provisioning")
-
-
-async def _run_sandbox_lifecycle(run_id: str, req: SandboxRunRequest):
-    """
-    Full lifecycle: provision -> run -> capture result -> destroy container.
-    Always destroys the container in a finally block — no orphaned sandboxes,
-    even on crash.
-    """
-    try:
-        clone_url = await _resolve_clone_url(req.repository_id)  # read-only deploy key scoped to this repo only
-
-        # Re-verify consent here too, independent of the check in
-        # create_sandbox_run — this is the request-handling process's own
-        # defense-in-depth layer, not a reuse of the earlier check's result.
-        synthetic_verified = req.request_synthetic_injection and await _repo_has_lab_consent(req.repository_id)
-
-        container_id = await asyncio.to_thread(
-            _launch_isolated_container,
-            run_id,
-            clone_url,
-            req.source_commit_sha,
-            req.trigger.value,
-            synthetic_verified,
+async def _get_active_repository(
+    session: AsyncSession,
+    repository_id: int,
+) -> tuple[Repository, ProviderInstallation]:
+    result = await session.execute(
+        select(Repository, ProviderInstallation)
+        .join(
+            ProviderInstallation,
+            ProviderInstallation.id == Repository.provider_installation_id,
         )
-        _ACTIVE_RUNS[run_id]["container_id"] = container_id
-        _ACTIVE_RUNS[run_id]["status"] = "running"
-
-        result = await _await_container_completion(container_id, timeout=CONTAINER_TTL_SECONDS)
-
-        _ACTIVE_RUNS[run_id]["status"] = "awaiting_review"
-        await _persist_run_result(run_id, req, result)
-
-    except TimeoutError:
-        logger.warning("sandbox run %s exceeded TTL, forcing teardown", run_id)
-        _ACTIVE_RUNS[run_id]["status"] = "expired"
-    except Exception:
-        logger.exception("sandbox run %s failed", run_id)
-        _ACTIVE_RUNS[run_id]["status"] = "failed"
-    finally:
-        await _destroy_container_if_exists(run_id)
+        .where(
+            Repository.id == repository_id,
+            ProviderInstallation.is_active.is_(True),
+        )
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository is not linked to an active provider installation",
+        )
+    return row
 
 
-async def _resolve_clone_url(repository_id: uuid.UUID) -> str:
-    # TODO: fetch a read-only, repo-scoped GitHub App installation token —
-    # never the org's general PAT, never write-scoped.
-    raise NotImplementedError
+@app.get(
+    "/lab/admin/installations/{provider_installation_id}/memberships",
+    response_model=list[MembershipResponse],
+)
+async def list_installation_memberships(
+    provider_installation_id: int,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    if not is_lab_operator(principal):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Global Lab operator permission required")
+    installation = await session.get(ProviderInstallation, provider_installation_id)
+    if installation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider installation not found")
+    result = await session.execute(
+        select(ProviderInstallationMembership)
+        .where(ProviderInstallationMembership.provider_installation_id == provider_installation_id)
+        .order_by(ProviderInstallationMembership.principal_subject)
+    )
+    return [_membership_response(membership) for membership in result.scalars()]
 
 
-async def _await_container_completion(container_id: str, timeout: int) -> dict:
-    # TODO: poll container status / stream logs; parse structured JSON result
-    # written by the sandbox entrypoint to a known path before it exits.
-    raise NotImplementedError
+@app.post("/lab/admin/installations/{provider_installation_id}/memberships", response_model=MembershipResponse)
+async def create_installation_membership(
+    provider_installation_id: int,
+    req: MembershipGrantRequest,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    membership = await grant_installation_membership(
+        session,
+        provider_installation_id,
+        req.subject,
+        req.role,
+        principal,
+    )
+    await session.commit()
+    await session.refresh(membership)
+    return _membership_response(membership)
 
 
-async def _persist_run_result(run_id: str, req: SandboxRunRequest, result: dict):
-    """
-    Writes diagnosis + proposed_fix_diff to `sandbox_runs`. Does NOT write
-    anything to `pattern_memory` here — that promotion is a separate,
-    deliberate, offline/batch step reviewed by a human (see
-    docs/NEIS_LEARNING_POLICY.md). No live weight updates happen in this path.
-    """
-    # TODO: DB write
-    raise NotImplementedError
+@app.delete(
+    "/lab/admin/installations/{provider_installation_id}/memberships/{membership_id}",
+    response_model=MembershipResponse,
+)
+async def delete_installation_membership(
+    provider_installation_id: int,
+    membership_id: int,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    membership = await revoke_installation_membership(
+        session,
+        provider_installation_id,
+        membership_id,
+        principal,
+    )
+    await session.commit()
+    await session.refresh(membership)
+    return _membership_response(membership)
 
 
-async def _destroy_container_if_exists(run_id: str):
-    container_id = _ACTIVE_RUNS.get(run_id, {}).get("container_id")
-    if not container_id:
-        return
-    try:
-        container = docker_client.containers.get(container_id)
-        container.remove(force=True)
-    except docker.errors.NotFound:
-        pass
+@app.post("/lab/runs", response_model=SandboxRunHandle)
+async def create_sandbox_run(
+    req: SandboxRunRequest,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    repository, installation = await _get_active_repository(session, req.repository_id)
+    await require_installation_role(session, installation.id, principal, RUN_ROLES)
+
+    if req.request_synthetic_injection and not (
+        repository.sandbox_lab_opt_in
+        and repository.sandbox_lab_consented_at is not None
+        and repository.sandbox_lab_consent_actor_id
+        and repository.sandbox_lab_consent_version
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This repository has not provided complete consent for synthetic injection",
+        )
+
+    # Intentionally fail closed. The runner still clones inside a network-
+    # isolated container and lacks the complete durable lifecycle integration.
+    # Do not accept or persist a run until host-side pinned cloning and verified
+    # immutable archive transfer replace that unsafe/incomplete path.
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "Lab execution is disabled pending the pinned host-side clone, "
+            "immutable source transfer, runner and result-persistence release gates"
+        ),
+    )
 
 
 @app.get("/lab/runs/{run_id}", response_model=SandboxRunHandle)
-async def get_sandbox_run(run_id: uuid.UUID):
-    run = _ACTIVE_RUNS.get(str(run_id))
-    if not run:
-        raise HTTPException(404, "run not found")
-    return SandboxRunHandle(run_id=run_id, status=run["status"], container_id=run.get("container_id"))
+async def get_sandbox_run(
+    run_id: uuid.UUID,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    run = await session.get(SandboxRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    await require_installation_role(session, run.provider_installation_id, principal, READ_ROLES)
+    return SandboxRunHandle(run_id=run.id, status=run.status, container_id=run.container_id)
 
 
 @app.post("/lab/runs/{run_id}/review")
-async def review_sandbox_run(run_id: uuid.UUID, decision: str, reviewer_user_id: uuid.UUID, notes: str = ""):
-    """
-    Human approval gate. Only 'approved' runs are eligible for PR creation —
-    and PR creation is a SEPARATE call the user must also explicitly trigger
-    from the dashboard, not an automatic consequence of approval. Two
-    deliberate clicks between "sandbox found a fix" and "code changes on
-    the real repo," by design.
-    """
-    if decision not in ("approved", "rejected"):
-        raise HTTPException(400, "decision must be 'approved' or 'rejected'")
-    run = _ACTIVE_RUNS.get(str(run_id))
-    if not run:
-        raise HTTPException(404, "run not found")
-    if run["status"] != "awaiting_review":
-        raise HTTPException(409, f"run is in status '{run['status']}', not awaiting review")
-    run["status"] = decision
-    # TODO: persist to run_reviews table
-    return {"run_id": run_id, "status": decision}
+async def review_sandbox_run(
+    run_id: uuid.UUID,
+    req: RunReviewRequest,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    result = await session.execute(select(SandboxRun).where(SandboxRun.id == run_id).with_for_update())
+    run = result.scalar_one_or_none()
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    await require_installation_role(session, run.provider_installation_id, principal, REVIEW_ROLES)
+    if run.status != "awaiting_review":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Run is in status '{run.status}', not awaiting review",
+        )
+
+    reviewer_subject = f"{principal.issuer}|{principal.subject}"
+    review = RunReview(
+        sandbox_run_id=run.id,
+        reviewed_by=reviewer_subject,
+        decision=req.decision,
+        notes=req.notes or None,
+    )
+    session.add(review)
+    run.status = req.decision
+    await session.commit()
+    await session.refresh(review)
+
+    return {
+        "run_id": run.id,
+        "review_id": review.id,
+        "status": run.status,
+        "reviewed_by": reviewer_subject,
+    }

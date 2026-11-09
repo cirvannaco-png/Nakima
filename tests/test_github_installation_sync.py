@@ -8,6 +8,7 @@ from githubapp.installation_sync import (
     sync_github_installation_event,
 )
 from models.provider_installation import ProviderInstallation
+from models.provider_installation_membership import ProviderInstallationMembership
 from models.repository import Repository
 
 
@@ -28,6 +29,11 @@ def _repository(repo_id=88001, full_name="example-org/service"):
 
 @pytest.mark.asyncio
 async def test_installation_repositories_added_is_idempotent_and_uses_canonical_repository_id(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "created", "installation": _installation(), "repositories": []},
+    )
     payload = {
         "action": "added",
         "installation": _installation(),
@@ -65,6 +71,11 @@ async def test_installation_repositories_added_is_idempotent_and_uses_canonical_
 
 @pytest.mark.asyncio
 async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "created", "installation": _installation(), "repositories": []},
+    )
     await sync_github_installation_event(
         db_session,
         "installation_repositories",
@@ -156,6 +167,17 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert repository is not None
     assert installation is not None
 
+    membership = ProviderInstallationMembership(
+        provider_installation_id=installation.id,
+        principal_issuer="https://identity.example.test/",
+        principal_subject="tenant-owner-1",
+        role="owner",
+        granted_by_issuer="https://identity.example.test/",
+        granted_by_subject="operator-1",
+    )
+    db_session.add(membership)
+    await db_session.commit()
+
     await sync_github_installation_event(
         db_session,
         "installation",
@@ -166,10 +188,19 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert installation.is_active is False
     assert repository.provider_installation_id is None
     assert repository.sandbox_lab_opt_in is False
+    assert membership.is_active is False
+    assert membership.revocation_reason == "installation_deleted"
+    assert membership.revoked_at is not None
+    assert membership.revoked_by_issuer == "urn:nakima:system"
 
 
 @pytest.mark.asyncio
 async def test_malformed_added_repository_fails_closed(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "created", "installation": _installation(), "repositories": []},
+    )
     with pytest.raises(ValueError, match="numeric id"):
         await sync_github_installation_event(
             db_session,
@@ -272,3 +303,90 @@ async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_s
         _repository(88001, "example-org/renamed-service"),
     )
     assert repository.full_name == "example-org/renamed-service"
+
+
+@pytest.mark.asyncio
+async def test_orphaned_added_event_cannot_create_installation_or_repository(db_session):
+    result = await sync_github_installation_event(
+        db_session,
+        "installation_repositories",
+        {
+            "action": "added",
+            "installation": _installation("9997"),
+            "repositories_added": [_repository(99002, "example-org/orphan-added")],
+        },
+    )
+
+    installations = (await db_session.execute(select(ProviderInstallation))).scalars().all()
+    repositories = (await db_session.execute(select(Repository))).scalars().all()
+
+    assert result["status"] == "ignored"
+    assert installations == []
+    assert repositories == []
+
+
+@pytest.mark.asyncio
+async def test_deleted_event_never_reattaches_repositories_from_payload(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    repository = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88001))
+    assert repository is not None
+    installation_id = repository.provider_installation_id
+
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "deleted",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    await db_session.commit()
+    await db_session.refresh(repository)
+
+    assert repository.provider_installation_id is None
+    installation = await db_session.get(ProviderInstallation, installation_id)
+    assert installation is not None
+    assert installation.is_active is False
+
+
+@pytest.mark.asyncio
+async def test_suspended_installation_rejects_repository_addition(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "suspend", "installation": _installation()},
+    )
+    await db_session.commit()
+
+    result = await sync_github_installation_event(
+        db_session,
+        "installation_repositories",
+        {
+            "action": "added",
+            "installation": _installation(),
+            "repositories_added": [_repository(88002, "example-org/suspended-addition")],
+        },
+    )
+    await db_session.commit()
+
+    suspended_addition = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88002))
+    assert result["status"] == "ignored"
+    assert suspended_addition is None

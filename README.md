@@ -85,7 +85,7 @@ GitHub Issue
 | **Quality Gate** | Blocks PRs when source changes have no accompanying test changes |
 | **Evolution review gate** | Roadmap recommendations stay proposals until a human accepts or dismisses them; accepting can open the GitHub issue |
 | **Market research (optional)** | Research → Judge → Opportunity pipeline turns external signals into proposals; disabled until a search backend is configured, and nothing it produces reaches the roadmap without an explicit promotion call |
-| **Sandbox lab & self-healing (in development)** | Partial scaffold only. Provider-neutral tenant/consent schema, signed GitHub installation sync, and active repository ownership checks are implemented on a draft branch. Isolated cloning, durable run/review/candidate tables, provider-backed diagnosis, candidate patch validation, and end-to-end security evidence remain incomplete. Not ready for live repositories |
+| **Sandbox lab & self-healing (in development)** | Draft implementation now includes canonical tenant/consent schema, signed GitHub installation lifecycle sync, durable run/candidate/review schema, OIDC verification and installation-scoped roles. The Lab API remains unmounted; run creation is deliberately disabled pending safe host-side cloning, isolated execution, typed results and end-to-end provider-backed validation. PR #95 still gates repository-scoped workflow credentials. |
 | **Token budget compression** | Trims planner context to a token budget, keeping high fan-in files so large repos stay within provider limits |
 | **Virus scanning** | ClamAV integration for uploaded documents |
 | **Command Centre** | Real-time dashboard at `/` |

@@ -7,61 +7,68 @@ real vs. stubbed right now.
 
 ## Database identity and tenant foundation
 
-- Migration `0013` adds a provider-neutral `provider_installations` table and links the existing integer-keyed `repositories` rows to an internal installation ID. External provider IDs are stored as strings and uniquely scoped by provider.
-- Legacy repositories remain unattached and Lab-opted-out. A database CHECK constraint requires an installation, consent timestamp, actor identifier, and consent version before opt-in.
-- Durable `sandbox_runs`, `run_reviews`, and `model_candidate_fixes`
-  tables are the next persistence slice. They are not part of migration
-  `0013` and are not yet in the canonical migration chain. Do not assume that
-  result, candidate, or review persistence is available on this branch.
-- `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
+- Migration `0013` adds provider-neutral `provider_installations` and links
+  the existing integer-keyed `repositories` rows to an internal installation
+  ID. External installation IDs are strings, unique within each provider.
+- Existing repository rows remain unattached and Lab-opted-out until trusted
+  provider metadata is synchronized. The database CHECK requires a complete
+  consent record before opt-in.
+- Migration `0014` adds `sandbox_runs`, `run_reviews`, and
+  `model_candidate_fixes`. Runs retain the canonical repository ID and
+  installation snapshot using restrictive FKs. PostgreSQL triggers verify
+  active installation ownership and synthetic-injection consent at creation.
+- Migration `0015` adds explicit OIDC principal memberships per provider
+  installation, with role, grantor, and revocation audit. Migration `0016`
+  expands review identity storage to the complete issuer + subject.
+- The old `db/schema.sql` UUID repository draft is non-executable and is not
+  in the Alembic chain. Do not apply it.
 
 ## API exposure and authorization blocker
 
-- The Lab FastAPI app in `orchestrator/main.py` is not mounted by the main
-  `api.router:app` and is not run by the current Compose services. The
-  production Dockerfile starts only `api.router:app`; the Compose
-  `sandbox` service only builds the runner image.
-- Keep the Lab app unexposed. It has no authenticated principal/tenant
-  membership dependency, takes UUID repository/organization identifiers
-  from the request, and accepts `reviewer_user_id` from the caller. A client
-  must never choose the reviewer identity or authorize its own tenant access.
-- Before mounting/deploying Lab endpoints, implement authentication,
-  installation-scoped membership/role checks, server-derived reviewer
-  identity, and authorization on run, read, review, and eventual PR-creation
-  operations.
+- The Lab FastAPI app in `orchestrator/main.py` remains unmounted and is not
+  run by the current Compose services. The production Dockerfile starts only
+  `api.router:app`; the Compose `sandbox` service only builds a runner image.
+- Lab requests now require OIDC bearer JWT verification against a configured
+  issuer, audience and HTTPS JWKS endpoint. Membership binds exact
+  `(issuer, subject)` identities to one provider installation. Roles separate
+  run creation, read access and review. Global operator actions require a
+  separate immutable-subject allowlist.
+- Caller-supplied UUID repository/organization IDs and
+  `reviewer_user_id` have been removed. Reviewer identity is derived from the
+  verified principal and stored as issuer + subject.
+- Configure `LAB_OIDC_ISSUER`, `LAB_OIDC_AUDIENCE`,
+  `LAB_OIDC_JWKS_URL`, and `LAB_OIDC_ADMIN_SUBJECTS` only after choosing an
+  identity provider. No provider is selected or configured in this branch.
+- The run-creation endpoint deliberately returns 503 even for authorized
+  callers. It does not create a run until the trusted-host clone, immutable
+  archive transfer, isolated runner, typed result contract and full lifecycle
+  are implemented. Read and review endpoints use durable records and roles.
+- Installation deletion revokes memberships; suspension blocks access while
+  preserving memberships for an explicit unsuspend. Webhook events never
+  auto-provision end-user membership.
 
-## Stubbed, needs implementation before first live test
+## Remaining P0 engineering work
 
-- `orchestrator/main.py::_repo_has_lab_consent` — still a placeholder; must
-  query the canonical repository row and fail closed unless the consent record
-  is complete, the provider installation is active, and the caller is
-  authorized for that installation.
-- `orchestrator/main.py::_resolve_clone_url` — must resolve a verified
-  provider installation and issue a **read-only**, single-repository token.
-  Never pass the workflow token or an org-wide PAT to the sandbox.
-- `orchestrator/main.py::_await_container_completion` — needs real container
-  log polling + a defined structured JSON contract the sandbox entrypoint
-  writes before exit. The Pydantic result contract and persistence path are
-  still missing.
-- `orchestrator/self_healing.py::diagnose_failure` and
-  `generate_candidate_fix` — need real model API wiring. Structured output
-  schemas need to be nailed down and tested against real CI logs from Nakima
-  and Medis-Touch before trusting them on other repos.
-
-## Deliberately simplified, revisit only with evidence
-
-- `_rough_diff_agreement` uses string-set uniqueness as a placeholder for
-  cross-model agreement. Should become AST-normalized diff comparison, but
-  not worth building until you have real multi-model candidate data to
-  validate the smarter version against.
-- Tie-break in `run_self_healing_loop` (`max(passing, key=lambda c:
-  len(c.rationale...))`) is a placeholder, not a real selection heuristic.
-  Needs a real judge step (likely: one more model call asking "which of
-  these N passing candidates is the cleanest fix, and why") before this
-  is trustworthy on ambiguous cases.
-- `MAX_CONCURRENT_RUNS = 4` and `MAX_HEAL_ATTEMPTS = 3` are reasonable
-  starting ceilings, not measured values. Revisit once you have real
-  first-test data on run duration and failure/retry rates.
+- Host-side, pinned repository clone and verified immutable archive transfer.
+  Never pass repository credentials or a clone URL into the network-isolated
+  container. Integrate a truly repository-scoped read-only credential; PR #95
+  separately addresses the ordinary GitHub workflow token permissions.
+- One authoritative sandbox image, tag and entrypoint. The current image
+  requested by the Lab scaffold does not match the image built by CI.
+- Typed result schema and versioned container output; bounded polling,
+  timeout/cancellation, terminal-state persistence, log capture and teardown.
+- Connect the lifecycle to the durable run/candidate/review tables. The
+  schema exists, but no safe execution lifecycle currently creates or completes
+  runs.
+- Wire `diagnose_failure` and `generate_candidate_fix` to provider APIs.
+  Apply every candidate patch to a clean worktree before tests; retain commit
+  SHA, test logs/results and per-candidate evidence.
+- Validate tenant isolation and access revocation through the actual Lab API
+  against a selected OIDC provider. The current JWT/membership primitives
+  have unit tests but have not been verified with a real provider or deployed
+  identity configuration.
+- Test the full path against controlled Nakima and Midas-Touch CI failures
+  before allowing customer repositories.
 
 ## Explicitly out of scope for this pass
 
@@ -76,14 +83,15 @@ real vs. stubbed right now.
 
 ## Security items requiring sign-off before first live test with real user repos
 
-- Replace in-container cloning: the current entrypoint needs network access
-  while the orchestrator disables container networking. Clone on the trusted
-  host at the pinned commit, then transfer a verified immutable archive.
-- Confirm sandbox container truly has `network_mode="none"` end-to-end (no
-  sidecar, no DNS resolution path that leaks out).
-- Confirm the GitHub App installation token scoping is actually read-only at
-  the GitHub API level, not just "we don't call write endpoints" — a
-  write-scoped token that's merely unused in code is still a live risk if
-  the sandbox is ever compromised.
-- Confirm `synthetic_injection_used` DB trigger (schema.sql) is tested with
-  an actual attempted bypass, not just reviewed by eye.
+- Verify the sandbox container truly has `network_mode="none"` end-to-end,
+  with no sidecar, DNS or host-mounted credential path that leaks access.
+- Verify the repository credential is read-only and restricted to exactly one
+  repository at the provider API level. The ordinary GitHub workflow token
+  remains a separate PR #95 integration gate.
+- Exercise the PostgreSQL active-installation and synthetic-consent triggers
+  with attempted bypasses. The migration integration test covers the current
+  denial/allowance path; adversarial tests still need to cover reassignment,
+  suspension, concurrent changes and deletion.
+- Verify OIDC issuer/audience/key rotation, operator bootstrap, role changes,
+  revoked membership behavior and concurrent review requests with the chosen
+  production identity provider.
