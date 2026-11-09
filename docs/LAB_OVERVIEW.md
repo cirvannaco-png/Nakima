@@ -24,10 +24,14 @@ The existing application schema is authoritative:
   to opted out. A database CHECK constraint prevents opt-in unless the
   installation, timestamp, actor, and consent-version are all present.
 
-Migration `0013` adds this foundation. It does **not** create Lab run or
-review persistence. The old `db/schema.sql` UUID-based repository schema was
-never part of the Alembic chain and is now explicitly marked deprecated and
-non-executable. Do not apply it.
+Migrations `0013` and `0014` add the provider tenant, consent, durable run,
+candidate, and review schema. Every run stores both the canonical repository
+ID and its provider-installation ID; a composite foreign key prevents a run
+from being attributed to a different installation. Synthetic-injection runs
+are additionally checked by a PostgreSQL trigger against the repository's
+complete opt-in record. The old `db/schema.sql` UUID-based repository schema
+was never part of the Alembic chain and is now explicitly marked deprecated
+and non-executable. Do not apply it.
 
 ## Target lifecycle (not yet implemented end to end)
 
@@ -60,11 +64,13 @@ non-executable. Do not apply it.
 - `diagnose_failure` and `generate_candidate_fix` are not wired to real
   provider calls. The current candidate loop also needs to apply each patch
   before testing it; otherwise it can validate the unchanged baseline.
-- Migrations `0014` and ORM models now define `sandbox_runs`,
-  `run_reviews`, and per-provider `model_candidate_fixes` against the
-  canonical integer repository ID. The orchestrator still uses an in-memory
-  registry and does not write/read these tables; there is no tenant-scoped
-  result API or end-to-end consent workflow.
+- Migrations `0014` and ORM models define `sandbox_runs`,
+  `run_reviews`, and per-provider `model_candidate_fixes`. Runs are bound
+  to the canonical repository and provider installation through a composite
+  foreign key; a database trigger checks synthetic-injection consent.
+  The orchestrator still uses an in-memory registry and does not write/read
+  these tables; there is no tenant-scoped result API or end-to-end consent
+  workflow.
 - Container completion, malformed result handling, timeouts, cancellation,
   teardown and terminal-state persistence are not complete.
 
