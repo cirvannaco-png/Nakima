@@ -1,6 +1,6 @@
 import pytest
-from sqlalchemy import select
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from lab.auth import LabPrincipal
 from lab.authorization import (
