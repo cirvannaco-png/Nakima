@@ -55,6 +55,14 @@ def upgrade() -> None:
         "repositories",
         ["provider_installation_id"],
     )
+    # GitHub's stable numeric repository identity must resolve to at most
+    # one canonical local row. Multiple NULLs remain valid for unlinked repos.
+    op.create_index(
+        "uq_repositories_github_repo_id",
+        "repositories",
+        ["github_repo_id"],
+        unique=True,
+    )
     op.create_unique_constraint(
         "uq_repositories_id_installation",
         "repositories",
@@ -99,6 +107,7 @@ def downgrade() -> None:
     op.drop_column("repositories", "sandbox_lab_consented_at")
     op.drop_column("repositories", "sandbox_lab_opt_in")
     op.drop_constraint("uq_repositories_id_installation", "repositories", type_="unique")
+    op.drop_index("uq_repositories_github_repo_id", table_name="repositories")
     op.drop_index("ix_repositories_provider_installation_id", table_name="repositories")
     op.drop_constraint("fk_repositories_provider_installation_id", "repositories", type_="foreignkey")
     op.drop_column("repositories", "provider_installation_id")
