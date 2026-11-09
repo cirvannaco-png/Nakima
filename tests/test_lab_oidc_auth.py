@@ -75,6 +75,7 @@ def _token(
     }
     return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "lab-test-key"})
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_accepts_valid_signature_and_claims(signing_material):
     private_key, jwks = signing_material
@@ -85,6 +86,7 @@ async def test_oidc_verifier_accepts_valid_signature_and_claims(signing_material
     assert principal.issuer == "https://identity.example.test/"
     assert principal.subject == "user-123"
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_wrong_issuer(signing_material):
     private_key, jwks = signing_material
@@ -92,6 +94,7 @@ async def test_oidc_verifier_rejects_wrong_issuer(signing_material):
 
     with pytest.raises(InvalidLabToken):
         await verifier.verify(_token(private_key, issuer="https://attacker.example.test/"))
+
 
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_wrong_audience(signing_material):
@@ -101,6 +104,7 @@ async def test_oidc_verifier_rejects_wrong_audience(signing_material):
     with pytest.raises(InvalidLabToken):
         await verifier.verify(_token(private_key, audience="other-api"))
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_expired_token(signing_material):
     private_key, jwks = signing_material
@@ -108,6 +112,7 @@ async def test_oidc_verifier_rejects_expired_token(signing_material):
 
     with pytest.raises(InvalidLabToken):
         await verifier.verify(_token(private_key, exp=int(time.time()) - 60))
+
 
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_unknown_kid(signing_material):
@@ -129,6 +134,7 @@ async def test_oidc_verifier_rejects_unknown_kid(signing_material):
     with pytest.raises(InvalidLabToken):
         await verifier.verify(token)
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_unsupported_algorithm(signing_material):
     private_key, jwks = signing_material
@@ -149,6 +155,7 @@ async def test_oidc_verifier_rejects_unsupported_algorithm(signing_material):
     with pytest.raises(InvalidLabToken):
         await verifier.verify(token)
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_requires_complete_configuration(signing_material):
     private_key, jwks = signing_material
@@ -157,6 +164,7 @@ async def test_oidc_verifier_requires_complete_configuration(signing_material):
 
     with pytest.raises(LabOIDCNotConfigured):
         await verifier.verify(_token(private_key))
+
 
 @pytest.mark.asyncio
 async def test_oidc_verifier_rejects_non_https_jwks_endpoint(signing_material):
@@ -167,6 +175,7 @@ async def test_oidc_verifier_rejects_non_https_jwks_endpoint(signing_material):
     with pytest.raises(LabOIDCNotConfigured):
         await verifier.verify(_token(private_key))
 
+
 @pytest.mark.asyncio
 async def test_oidc_verifier_caches_jwks_document(signing_material):
     private_key, jwks = signing_material
@@ -176,6 +185,7 @@ async def test_oidc_verifier_caches_jwks_document(signing_material):
     await verifier.verify(_token(private_key, subject="second"))
 
     assert verifier.fetch_count == 1
+
 
 @pytest.mark.asyncio
 async def test_oidc_verifier_refreshes_jwks_once_when_provider_rotates_key():
@@ -236,6 +246,7 @@ async def test_oidc_verifier_refreshes_jwks_once_when_provider_rotates_key():
 
     assert principal.subject == "rotated-user"
     assert verifier.fetch_count == 2
+
 
 @pytest.mark.asyncio
 async def test_oidc_verifier_requires_authorized_party_for_multiple_audiences(signing_material):
