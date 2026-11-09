@@ -18,6 +18,12 @@ The existing application schema is authoritative:
   external installation identifier is stored as text with a unique
   `(provider, external_installation_id)` constraint, so GitHub, GitLab, and
   future providers do not impose their external ID formats on Nakima.
+- The GitHub provider adapter now consumes signed `installation` and
+  `installation_repositories` webhooks. It upserts installation/account
+  metadata, associates repository IDs with the existing canonical rows,
+  handles rename/add/remove events, marks suspensions/deletions inactive, and
+  revokes Lab consent on suspension, deletion, removal, or reassignment.
+  These events do not mint or receive an automation token.
 - `repositories.provider_installation_id` associates a repository with its
   provider installation. Existing rows remain unattached until verified.
 - Lab consent is stored on the canonical repository row. Legacy rows default
@@ -55,6 +61,11 @@ and non-executable. Do not apply it.
   uses an in-memory run registry, and contains unimplemented consent,
   clone-resolution, result-polling, and persistence functions. Its request
   contract does not yet use the canonical integer repository key.
+- The installation webhook adapter is GitHub-specific (as intended for the
+  current integration). The generic installation model is provider-neutral,
+  but other providers still need their own webhook/sync adapters. Normal
+  issue/push/PR events also still need to be bound to the stored installation
+  row before any workflow token is minted.
 - The sandbox container is launched with `network_mode="none"`, while the
   current entrypoint attempts to clone from GitHub inside the container.
   Those requirements contradict each other. Host-side clone and immutable
