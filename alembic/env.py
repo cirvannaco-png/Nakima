@@ -11,7 +11,6 @@ from models.document import ProjectDocument  # noqa: F401
 from models.graph import GraphEdge, GraphNode  # noqa: F401
 from models.intelligence.decision import EngineeringDecision, EngineeringEvent  # noqa: F401
 from models.knowledge import KnowledgeEdge, KnowledgeNode  # noqa: F401
-from models.lab import ModelCandidateFix, RunReview, SandboxRun  # noqa: F401
 from models.neis.evolution_roadmap import EvolutionRoadmap, EvolutionRoadmapItem  # noqa: F401
 from models.neis.external_opportunity import (  # noqa: F401
     ExternalOpportunity,
