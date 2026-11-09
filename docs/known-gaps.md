@@ -21,7 +21,8 @@ real vs. stubbed right now.
 
 - `orchestrator/main.py::_repo_has_lab_consent` — still a placeholder; must
   query the canonical repository row and fail closed unless the consent record
-  is complete and the caller is authorized for its provider installation.
+  is complete, the provider installation is active, and the caller is
+  authorized for that installation.
 - `orchestrator/main.py::_resolve_clone_url` — must resolve a verified
   provider installation and issue a **read-only**, single-repository token.
   Never pass the workflow token or an org-wide PAT to the sandbox.
