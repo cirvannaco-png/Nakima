@@ -19,11 +19,13 @@ def upgrade() -> None:
     op.create_table(
         "sandbox_runs",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "repository_id",
-            sa.Integer(),
-            sa.ForeignKey("repositories.id", ondelete="CASCADE"),
-            nullable=False,
+        sa.Column("repository_id", sa.Integer(), nullable=False),
+        sa.Column("provider_installation_id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["repository_id", "provider_installation_id"],
+            ["repositories.id", "repositories.provider_installation_id"],
+            ondelete="CASCADE",
+            name="fk_sandbox_runs_repository_tenant",
         ),
         sa.Column("trigger", sa.String(length=32), nullable=False),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="queued"),
@@ -65,6 +67,36 @@ def upgrade() -> None:
             name="ck_sandbox_runs_synthetic_trigger",
         ),
     )
+    op.execute(
+        """
+        CREATE FUNCTION enforce_sandbox_run_consent()
+        RETURNS trigger AS $
+        BEGIN
+            IF NEW.synthetic_injection_used AND NOT EXISTS (
+                SELECT 1
+                FROM repositories
+                WHERE id = NEW.repository_id
+                  AND provider_installation_id = NEW.provider_installation_id
+                  AND sandbox_lab_opt_in = true
+            ) THEN
+                RAISE EXCEPTION
+                    'synthetic injection requires complete Lab consent for repository %',
+                    NEW.repository_id;
+            END IF;
+            RETURN NEW;
+        END;
+        $ LANGUAGE plpgsql;
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_enforce_sandbox_run_consent
+        BEFORE INSERT OR UPDATE OF repository_id, provider_installation_id, synthetic_injection_used
+        ON sandbox_runs
+        FOR EACH ROW EXECUTE FUNCTION enforce_sandbox_run_consent();
+        """
+    )
+
     op.create_index(
         "ix_sandbox_runs_repository_created",
         "sandbox_runs",
@@ -124,6 +156,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS trg_enforce_sandbox_run_consent ON sandbox_runs")
+    op.execute("DROP FUNCTION IF EXISTS enforce_sandbox_run_consent()")
     op.drop_table("model_candidate_fixes")
     op.drop_index("ix_run_reviews_run_reviewed", table_name="run_reviews")
     op.drop_table("run_reviews")
