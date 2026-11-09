@@ -62,3 +62,20 @@ async def test_lab_opt_in_requires_installation_and_complete_consent_record(db_s
     assert stored.sandbox_lab_opt_in is True
     assert stored.provider_installation_id == installation.id
     assert stored.sandbox_lab_consent_actor_id == "github-user:9001"
+
+
+
+@pytest.mark.asyncio
+async def test_external_installation_ids_are_namespaced_by_provider(db_session):
+    github = ProviderInstallation(provider="github", external_installation_id="42")
+    gitlab = ProviderInstallation(provider="gitlab", external_installation_id="42")
+    db_session.add_all([github, gitlab])
+    await db_session.commit()
+
+    assert github.id != gitlab.id
+
+    duplicate = ProviderInstallation(provider="github", external_installation_id="42")
+    db_session.add(duplicate)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
