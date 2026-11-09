@@ -1,4 +1,5 @@
 import pytest
+from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -36,6 +37,8 @@ async def test_lab_run_review_and_candidate_records_use_canonical_repository(db_
         candidate_diff="diff --git a/app.py b/app.py",
         candidate_status="tested",
         test_suite_passed=True,
+        applied_commit_sha="d" * 40,
+        tested_at=datetime.now(UTC),
         test_results={"passed": 42, "failed": 0},
     )
     review = RunReview(
@@ -110,6 +113,111 @@ async def test_synthetic_injection_requires_matching_run_trigger(db_session):
         trigger="ci_failure",
         source_commit_sha="c" * 40,
         synthetic_injection_used=True,
+    )
+    db_session.add(invalid)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+
+
+
+@pytest.mark.asyncio
+async def test_run_tenant_snapshot_survives_repository_detachment(db_session):
+    installation = ProviderInstallation(provider="github", external_installation_id="detach-history-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/detach-history", provider_installation_id=installation.id)
+    db_session.add(repository)
+    await db_session.flush()
+
+    run = SandboxRun(
+        repository_id=repository.id,
+        provider_installation_id=installation.id,
+        trigger="manual",
+        source_commit_sha="e" * 40,
+    )
+    db_session.add(run)
+    await db_session.commit()
+
+    # Provider removal revokes the current repository link and consent, but
+    # the historical run retains the tenant that owned it when created.
+    repository.provider_installation_id = None
+    repository.sandbox_lab_opt_in = False
+    repository.sandbox_lab_consented_at = None
+    repository.sandbox_lab_consent_actor_id = None
+    repository.sandbox_lab_consent_version = None
+    await db_session.commit()
+
+    stored_run = await db_session.scalar(select(SandboxRun).where(SandboxRun.id == run.id))
+    assert stored_run is not None
+    assert stored_run.repository_id == repository.id
+    assert stored_run.provider_installation_id == installation.id
+    assert stored_run.repository.provider_installation_id is None
+
+
+@pytest.mark.asyncio
+async def test_only_one_candidate_can_be_selected_for_a_run(db_session):
+    installation = ProviderInstallation(provider="github", external_installation_id="one-winner-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/one-winner", provider_installation_id=installation.id)
+    db_session.add(repository)
+    await db_session.flush()
+
+    run = SandboxRun(
+        repository_id=repository.id,
+        provider_installation_id=installation.id,
+        trigger="manual",
+        source_commit_sha="f" * 40,
+    )
+    db_session.add(run)
+    await db_session.flush()
+
+    timestamp = datetime.now(UTC)
+    candidates = [
+        ModelCandidateFix(
+            sandbox_run_id=run.id,
+            provider="github",
+            candidate_diff=f"candidate patch {index}",
+            candidate_status="selected",
+            test_suite_passed=True,
+            applied_commit_sha=str(index) * 40,
+            tested_at=timestamp,
+            test_results={"passed": 15, "failed": 0},
+        )
+        for index in (1, 2)
+    ]
+    db_session.add_all(candidates)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_tested_candidate_requires_commit_and_full_test_evidence(db_session):
+    installation = ProviderInstallation(provider="github", external_installation_id="tested-evidence-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/tested-evidence", provider_installation_id=installation.id)
+    db_session.add(repository)
+    await db_session.flush()
+
+    run = SandboxRun(
+        repository_id=repository.id,
+        provider_installation_id=installation.id,
+        trigger="manual",
+        source_commit_sha="1" * 40,
+    )
+    db_session.add(run)
+    await db_session.flush()
+
+    invalid = ModelCandidateFix(
+        sandbox_run_id=run.id,
+        provider="github",
+        candidate_diff="candidate patch without applied-worktree evidence",
+        candidate_status="tested",
+        test_suite_passed=True,
+        test_results={"passed": 15, "failed": 0},
     )
     db_session.add(invalid)
     with pytest.raises(IntegrityError):
