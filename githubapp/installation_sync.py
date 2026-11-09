@@ -223,6 +223,7 @@ async def sync_github_installation_event(
         removed += int(await _remove_repository(session, installation, item))
     return {"status": "synced", "action": action, "repositories_added": 0, "repositories_removed": removed}
 
+
 async def require_active_github_repository_installation(
     session: AsyncSession,
     installation_payload: dict,
@@ -253,9 +254,7 @@ async def require_active_github_repository_installation(
     if installation is None or not installation.is_active:
         raise ValueError("GitHub App installation is not registered or is inactive")
 
-    repository_result = await session.execute(
-        select(Repository).where(Repository.github_repo_id == github_repo_id)
-    )
+    repository_result = await session.execute(select(Repository).where(Repository.github_repo_id == github_repo_id))
     repository = repository_result.scalar_one_or_none()
     if repository is None or repository.provider_installation_id != installation.id:
         raise ValueError("Repository is not linked to this active GitHub App installation")
