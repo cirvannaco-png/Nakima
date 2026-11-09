@@ -26,6 +26,7 @@ def _installation(installation_id="7001"):
 def _repository(repo_id=88001, full_name="example-org/service"):
     return {"id": repo_id, "full_name": full_name}
 
+
 @pytest.mark.asyncio
 async def test_installation_repositories_added_is_idempotent_and_uses_canonical_repository_id(db_session):
     await sync_github_installation_event(
@@ -66,6 +67,7 @@ async def test_installation_repositories_added_is_idempotent_and_uses_canonical_
     assert repository_rows[0].full_name == "example-org/service"
     assert repository_rows[0].provider_installation_id == installations[0].id
     assert installations[0].is_active is True
+
 
 @pytest.mark.asyncio
 async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_session):
@@ -109,6 +111,7 @@ async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_ses
     assert repository.sandbox_lab_consent_actor_id is None
     assert repository.sandbox_lab_consent_version is None
 
+
 @pytest.mark.asyncio
 async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db_session):
     await sync_github_installation_event(
@@ -144,6 +147,7 @@ async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db
     assert installation.deactivated_at is not None
     assert repository.provider_installation_id == installation.id
     assert repository.sandbox_lab_opt_in is False
+
 
 @pytest.mark.asyncio
 async def test_installation_deletion_detaches_repositories(db_session):
@@ -189,6 +193,7 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert membership.revoked_at is not None
     assert membership.revoked_by_issuer == "urn:nakima:system"
 
+
 @pytest.mark.asyncio
 async def test_malformed_added_repository_fails_closed(db_session):
     await sync_github_installation_event(
@@ -208,6 +213,7 @@ async def test_malformed_added_repository_fails_closed(db_session):
         )
     await db_session.rollback()
 
+
 @pytest.mark.asyncio
 async def test_orphaned_removal_does_not_create_an_installation(db_session):
     result = await sync_github_installation_event(
@@ -225,6 +231,7 @@ async def test_orphaned_removal_does_not_create_an_installation(db_session):
     assert result["status"] == "ignored"
     assert installations == []
 
+
 @pytest.mark.asyncio
 async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
     result = await sync_github_installation_event(
@@ -237,6 +244,7 @@ async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
 
     assert result["status"] == "ignored"
     assert installations == []
+
 
 @pytest.mark.asyncio
 async def test_normal_repository_webhook_requires_existing_active_installation_link(db_session):
@@ -276,6 +284,7 @@ async def test_normal_repository_webhook_requires_existing_active_installation_l
             _repository(),
         )
 
+
 @pytest.mark.asyncio
 async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_session):
     await sync_github_installation_event(
@@ -295,6 +304,7 @@ async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_s
     )
     assert repository.full_name == "example-org/renamed-service"
 
+
 @pytest.mark.asyncio
 async def test_orphaned_added_event_cannot_create_installation_or_repository(db_session):
     result = await sync_github_installation_event(
@@ -313,6 +323,7 @@ async def test_orphaned_added_event_cannot_create_installation_or_repository(db_
     assert result["status"] == "ignored"
     assert installations == []
     assert repositories == []
+
 
 @pytest.mark.asyncio
 async def test_deleted_event_never_reattaches_repositories_from_payload(db_session):
@@ -345,6 +356,7 @@ async def test_deleted_event_never_reattaches_repositories_from_payload(db_sessi
     installation = await db_session.get(ProviderInstallation, installation_id)
     assert installation is not None
     assert installation.is_active is False
+
 
 @pytest.mark.asyncio
 async def test_suspended_installation_rejects_repository_addition(db_session):
