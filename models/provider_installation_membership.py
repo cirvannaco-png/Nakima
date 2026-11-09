@@ -25,6 +25,11 @@ class ProviderInstallationMembership(Base):
             "length(principal_issuer) > 0 AND length(principal_subject) > 0",
             name="ck_installation_membership_principal",
         ),
+        CheckConstraint(
+            "is_active = true OR (revoked_at IS NOT NULL AND "
+            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL)",
+            name="ck_installation_membership_revocation_audit",
+        ),
         Index(
             "ix_installation_membership_active_role",
             "provider_installation_id",
