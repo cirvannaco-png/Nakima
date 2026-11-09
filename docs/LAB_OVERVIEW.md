@@ -60,8 +60,11 @@ non-executable. Do not apply it.
 - `diagnose_failure` and `generate_candidate_fix` are not wired to real
   provider calls. The current candidate loop also needs to apply each patch
   before testing it; otherwise it can validate the unchanged baseline.
-- There is no durable `sandbox_runs` or `run_reviews` ORM model/migration,
-  no tenant-scoped result API, and no end-to-end consent workflow.
+- Migrations `0014` and ORM models now define `sandbox_runs`,
+  `run_reviews`, and per-provider `model_candidate_fixes` against the
+  canonical integer repository ID. The orchestrator still uses an in-memory
+  registry and does not write/read these tables; there is no tenant-scoped
+  result API or end-to-end consent workflow.
 - Container completion, malformed result handling, timeouts, cancellation,
   teardown and terminal-state persistence are not complete.
 
