@@ -111,7 +111,9 @@ def detect_test_command(repo_path: Path) -> list[str]:
     if (repo_path / "pytest.ini").exists() or (repo_path / "pyproject.toml").exists():
         return ["python3", "-m", "pytest", "-q"]
     if (repo_path / "package.json").exists():
-        return ["npm", "test", "--silent"]
+        raise RuntimeError(
+            "Node.js repositories are not supported until a verified offline dependency cache is available"
+        )
     raise RuntimeError("No supported test runner was detected in the pinned repository")
 
 
