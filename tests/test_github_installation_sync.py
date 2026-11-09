@@ -37,18 +37,20 @@ async def test_installation_repositories_added_is_idempotent_and_uses_canonical_
     await db_session.commit()
 
     repository_rows = (
-        await db_session.execute(
-            select(Repository).where(Repository.github_repo_id == 88001)
-        )
-    ).scalars().all()
+        (await db_session.execute(select(Repository).where(Repository.github_repo_id == 88001))).scalars().all()
+    )
     installations = (
-        await db_session.execute(
-            select(ProviderInstallation).where(
-                ProviderInstallation.provider == "github",
-                ProviderInstallation.external_installation_id == "7001",
+        (
+            await db_session.execute(
+                select(ProviderInstallation).where(
+                    ProviderInstallation.provider == "github",
+                    ProviderInstallation.external_installation_id == "7001",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assert first["repositories_added"] == second["repositories_added"] == 1
     assert len(repository_rows) == 1
@@ -69,9 +71,7 @@ async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_ses
             "repositories_added": [_repository()],
         },
     )
-    repository = await db_session.scalar(
-        select(Repository).where(Repository.github_repo_id == 88001)
-    )
+    repository = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88001))
     assert repository is not None
     repository.sandbox_lab_opt_in = True
     repository.sandbox_lab_consented_at = datetime.now(UTC).replace(tzinfo=None)
@@ -113,9 +113,7 @@ async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db
         select(Repository).where(Repository.github_repo_id == 88001)
     )
     installation = await db_session.scalar(
-        select(ProviderInstallation).where(
-            ProviderInstallation.external_installation_id == "7001"
-        )
+        select(ProviderInstallation).where(ProviderInstallation.external_installation_id == "7001")
     )
     assert repository is not None
     assert installation is not None
