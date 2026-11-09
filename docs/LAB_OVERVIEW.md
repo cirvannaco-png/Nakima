@@ -106,9 +106,17 @@ acceptance gates.
 The Lab API now has a generic OIDC verifier (issuer, audience, HTTPS JWKS),
 an explicit operator subject allowlist, auditable installation-scoped
 membership grants, role checks on run/read/review, and server-derived reviewer
-identity. Configure `LAB_OIDC_ISSUER`, `LAB_OIDC_AUDIENCE`,
-`LAB_OIDC_JWKS_URL`, and `LAB_OIDC_ADMIN_SUBJECTS` with a chosen production
-identity provider before deployment. Keep the Lab service unmounted until
+identity. Configure these values from the chosen identity provider before
+deployment:
+
+- `LAB_OIDC_ISSUER`: exact issuer URL from the provider's OIDC metadata
+- `LAB_OIDC_AUDIENCE`: audience/client identifier accepted by the Lab API
+- `LAB_OIDC_JWKS_URL`: provider's HTTPS JSON Web Key Set endpoint
+- `LAB_OIDC_ADMIN_SUBJECTS`: comma-separated immutable `sub` values allowed
+  to administer installation memberships
+
+No default issuer, audience, JWKS host, email-based identity, or automatic
+membership is assumed. Keep the Lab service unmounted until
 provider-backed login, operator provisioning, membership lifecycle and
 end-to-end authorization tests pass.
 
