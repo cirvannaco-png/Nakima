@@ -57,10 +57,21 @@ and non-executable. Do not apply it.
 
 ## Confirmed blockers
 
-- `orchestrator/main.py` still accepts UUID repository/organization IDs,
-  uses an in-memory run registry, and contains unimplemented consent,
-  clone-resolution, result-polling, and persistence functions. Its request
-  contract does not yet use the canonical integer repository key.
+- `orchestrator/main.py` is a separate FastAPI application and is not
+  mounted by `api/router.py` or run as a service in the current
+  `docker-compose.yml`. The current production Dockerfile starts only
+  `api.router:app`. Lab endpoints are therefore not part of the deployed
+  Nakima API.
+- Do not expose or mount that app yet: its request contract still accepts
+  caller-supplied UUID repository/organization IDs, and the review endpoint
+  accepts a caller-supplied reviewer ID. There is no authenticated Lab
+  principal or tenant-membership authorization dependency. Exposing it as
+  written would allow spoofed reviewer identities and unauthorized run
+  requests.
+- `orchestrator/main.py` also uses an in-memory run registry and contains
+  unimplemented consent, clone-resolution, result-polling, and persistence
+  functions. Its request contract does not yet use the canonical integer
+  repository key.
 - The installation webhook adapter is GitHub-specific (as intended for the
   current integration). The generic installation model is provider-neutral,
   but other providers still need their own webhook/sync adapters. Normal
@@ -87,6 +98,15 @@ and non-executable. Do not apply it.
 
 See `docs/known-gaps.md` and issue #94 for the implementation sequence and
 acceptance gates.
+
+## Authentication and deployment gate
+
+Before exposing any Lab API, implement authenticated user identity and
+installation-scoped tenant membership. Derive the reviewer ID from the
+authenticated principal; never accept it as an authority-bearing request
+field. Enforce membership/role checks on run creation, result reads, review,
+and any later PR-creation endpoint. Keep the Lab service unmounted until
+these checks and integration tests pass.
 
 ## Safety rule
 
