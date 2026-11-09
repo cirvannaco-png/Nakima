@@ -139,9 +139,7 @@ async def _remove_repository(
     repository_payload: dict,
 ) -> bool:
     github_repo_id = _github_repo_id(repository_payload.get("id"))
-    result = await session.execute(
-        select(Repository).where(Repository.github_repo_id == github_repo_id)
-    )
+    result = await session.execute(select(Repository).where(Repository.github_repo_id == github_repo_id))
     repository = result.scalar_one_or_none()
     if repository is None or repository.provider_installation_id != installation.id:
         return False
