@@ -67,13 +67,10 @@ _MANIFEST: dict = {
         "status",
     ],
     "default_permissions": {
-        "checks": "write",
-        "contents": "read",
-        "issues": "write",
+        "contents": "write",
+        "issues": "read",
         "metadata": "read",
         "pull_requests": "write",
-        "statuses": "write",
-        "workflows": "write",
     },
 }
 

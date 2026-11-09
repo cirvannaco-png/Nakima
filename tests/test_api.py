@@ -41,7 +41,9 @@ def test_webhook_rejects_bad_signature():
 
 def test_webhook_ignores_irrelevant_events():
     client = _client()
-    body = json.dumps({"action": "created", "installation": {"id": 42}, "repository": {"full_name": "k/r"}}).encode()
+    body = json.dumps(
+        {"action": "created", "installation": {"id": 42}, "repository": {"id": 101, "full_name": "k/r"}}
+    ).encode()
     sig = "sha256=" + hmac.new(b"testsecret", body, hashlib.sha256).hexdigest()
     r = client.post(
         "/github/webhook",
@@ -62,7 +64,7 @@ def test_webhook_valid_signature_reaches_auth_and_fails_cleanly():
         {
             "action": "opened",
             "installation": {"id": 42},
-            "repository": {"full_name": "k/r"},
+            "repository": {"id": 101, "full_name": "k/r"},
             "issue": {"title": "x", "body": "y", "number": 1},
         }
     ).encode()
@@ -74,3 +76,14 @@ def test_webhook_valid_signature_reaches_auth_and_fails_cleanly():
     )
     assert r.status_code == 502
     assert "Could not authenticate" in r.json()["detail"]
+
+
+def test_github_app_manifest_requests_only_workflow_permissions():
+    from githubapp.setup import _MANIFEST
+
+    assert _MANIFEST["default_permissions"] == {
+        "contents": "write",
+        "issues": "read",
+        "metadata": "read",
+        "pull_requests": "write",
+    }
