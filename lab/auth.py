@@ -49,12 +49,20 @@ class OIDCVerifier:
         if not issuer or not audience or not jwks_url:
             raise LabOIDCNotConfigured("Lab OIDC is not fully configured")
 
+        issuer_parsed = urlparse(issuer)
         parsed = urlparse(jwks_url)
         local_http_allowed = (
             self.config.ENVIRONMENT != "production"
             and parsed.scheme == "http"
             and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
         )
+        local_issuer_http_allowed = (
+            self.config.ENVIRONMENT != "production"
+            and issuer_parsed.scheme == "http"
+            and issuer_parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        )
+        if issuer_parsed.scheme != "https" and not local_issuer_http_allowed:
+            raise LabOIDCNotConfigured("The configured OIDC issuer must use HTTPS")
         if parsed.scheme != "https" and not local_http_allowed:
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint must use HTTPS")
         if parsed.username or parsed.password or not parsed.hostname:
@@ -76,14 +84,14 @@ class OIDCVerifier:
             raise LabIdentityProviderUnavailable("OIDC JWKS document is malformed")
         return document
 
-    async def _get_jwks(self, jwks_url: str) -> dict:
+    async def _get_jwks(self, jwks_url: str, force_refresh: bool = False) -> dict:
         now = time.monotonic()
-        if self._jwks is not None and self._jwks_expires_at > now:
+        if not force_refresh and self._jwks is not None and self._jwks_expires_at > now:
             return self._jwks
 
         async with self._lock:
             now = time.monotonic()
-            if self._jwks is not None and self._jwks_expires_at > now:
+            if not force_refresh and self._jwks is not None and self._jwks_expires_at > now:
                 return self._jwks
             document = await self._fetch_jwks(jwks_url)
             ttl = int(self.config.LAB_OIDC_JWKS_CACHE_SECONDS)
@@ -110,6 +118,12 @@ class OIDCVerifier:
         try:
             jwk_set = jwt.PyJWKSet.from_dict(jwks_document)
             candidates = [key for key in jwk_set.keys if key.key_id == key_id]
+            if not candidates:
+                # Permit provider key rotation without waiting for the whole
+                # cache TTL, but never fall back to a different key.
+                jwks_document = await self._get_jwks(jwks_url, force_refresh=True)
+                jwk_set = jwt.PyJWKSet.from_dict(jwks_document)
+                candidates = [key for key in jwk_set.keys if key.key_id == key_id]
             if len(candidates) != 1:
                 raise InvalidLabToken("Bearer token signing key is missing or ambiguous")
             signing_key = candidates[0]
