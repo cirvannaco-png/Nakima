@@ -222,3 +222,54 @@ async def sync_github_installation_event(
     for item in items:
         removed += int(await _remove_repository(session, installation, item))
     return {"status": "synced", "action": action, "repositories_added": 0, "repositories_removed": removed}
+
+async def require_active_github_repository_installation(
+    session: AsyncSession,
+    installation_payload: dict,
+    repository_payload: dict,
+) -> Repository:
+    """Require a previously synchronized, active installation-to-repository link.
+
+    Ordinary issue/push/PR webhooks are not allowed to create or reassign
+    tenant ownership. Only installation lifecycle events may do that.
+    """
+    if not isinstance(installation_payload, dict) or not isinstance(repository_payload, dict):
+        raise ValueError("Webhook is missing its installation or repository object")
+
+    external_id = _external_id(installation_payload.get("id"), "installation id")
+    github_repo_id = _github_repo_id(repository_payload.get("id"))
+    full_name = repository_payload.get("full_name")
+    if not isinstance(full_name, str) or not full_name.strip() or len(full_name) > 200:
+        raise ValueError("Repository payload is missing a valid full_name")
+    full_name = full_name.strip()
+
+    installation_result = await session.execute(
+        select(ProviderInstallation).where(
+            ProviderInstallation.provider == "github",
+            ProviderInstallation.external_installation_id == external_id,
+        )
+    )
+    installation = installation_result.scalar_one_or_none()
+    if installation is None or not installation.is_active:
+        raise ValueError("GitHub App installation is not registered or is inactive")
+
+    repository_result = await session.execute(
+        select(Repository).where(Repository.github_repo_id == github_repo_id)
+    )
+    repository = repository_result.scalar_one_or_none()
+    if repository is None or repository.provider_installation_id != installation.id:
+        raise ValueError("Repository is not linked to this active GitHub App installation")
+
+    if repository.full_name != full_name:
+        collision_result = await session.execute(
+            select(Repository).where(
+                Repository.full_name == full_name,
+                Repository.id != repository.id,
+            )
+        )
+        if collision_result.scalar_one_or_none() is not None:
+            raise ValueError(f"Repository rename would collide with an existing local repository: {full_name}")
+        repository.full_name = full_name
+
+    return repository
+
