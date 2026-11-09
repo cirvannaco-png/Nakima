@@ -64,6 +64,8 @@ ignore = ["E501", "S101", "S603", "S607", "S108"]
 "planner/context_builder.py" = ["S110"]
 # Default credentials in config and fake credentials in tests are intentional
 "core/config.py" = ["S105"]
+"lab/*.py" = ["B008"]
+"orchestrator/main.py" = ["B008"]
 "tests/*.py" = ["S105", "S106"]
 
 [tool.bandit]
