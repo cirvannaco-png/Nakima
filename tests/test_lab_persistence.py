@@ -3,17 +3,22 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from models.lab import ModelCandidateFix, RunReview, SandboxRun
+from models.provider_installation import ProviderInstallation
 from models.repository import Repository
 
 
 @pytest.mark.asyncio
 async def test_lab_run_review_and_candidate_records_use_canonical_repository(db_session):
-    repository = Repository(full_name="example/lab-target")
+    installation = ProviderInstallation(provider="github", external_installation_id="lab-target-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/lab-target", provider_installation_id=installation.id)
     db_session.add(repository)
     await db_session.flush()
 
     run = SandboxRun(
         repository_id=repository.id,
+        provider_installation_id=installation.id,
         trigger="ci_failure",
         source_commit_sha="a" * 40,
     )
@@ -61,12 +66,16 @@ async def test_lab_run_review_and_candidate_records_use_canonical_repository(db_
 
 @pytest.mark.asyncio
 async def test_candidate_cannot_be_selected_without_passing_test_evidence(db_session):
-    repository = Repository(full_name="example/candidate-gate")
+    installation = ProviderInstallation(provider="github", external_installation_id="candidate-gate-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/candidate-gate", provider_installation_id=installation.id)
     db_session.add(repository)
     await db_session.flush()
 
     run = SandboxRun(
         repository_id=repository.id,
+        provider_installation_id=installation.id,
         trigger="manual",
         source_commit_sha="b" * 40,
     )
@@ -88,12 +97,16 @@ async def test_candidate_cannot_be_selected_without_passing_test_evidence(db_ses
 
 @pytest.mark.asyncio
 async def test_synthetic_injection_requires_matching_run_trigger(db_session):
-    repository = Repository(full_name="example/synthetic-gate")
+    installation = ProviderInstallation(provider="github", external_installation_id="synthetic-gate-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/synthetic-gate", provider_installation_id=installation.id)
     db_session.add(repository)
     await db_session.flush()
 
     invalid = SandboxRun(
         repository_id=repository.id,
+        provider_installation_id=installation.id,
         trigger="ci_failure",
         source_commit_sha="c" * 40,
         synthetic_injection_used=True,
