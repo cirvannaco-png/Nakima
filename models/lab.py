@@ -101,7 +101,8 @@ class RunReview(Base):
         ForeignKey("sandbox_runs.id", ondelete="CASCADE"),
         nullable=False,
     )
-    reviewed_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Issuer + immutable OIDC subject, never a client-supplied display name.
+    reviewed_by: Mapped[str] = mapped_column(String(768), nullable=False)
     decision: Mapped[str] = mapped_column(String(16), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime] = mapped_column(
