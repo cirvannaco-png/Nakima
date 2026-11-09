@@ -300,3 +300,56 @@ async def test_postgres_trigger_enforces_active_installation_and_synthetic_conse
             assert stored.provider_installation_id == installation.id
     finally:
         await engine.dispose()
+
+
+
+@pytest.mark.asyncio
+async def test_network_isolation_claim_requires_container_evidence(db_session):
+    installation = ProviderInstallation(provider="github", external_installation_id="isolation-evidence-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/isolation-evidence", provider_installation_id=installation.id)
+    db_session.add(repository)
+    await db_session.flush()
+
+    run = SandboxRun(
+        repository_id=repository.id,
+        provider_installation_id=installation.id,
+        trigger="manual",
+        source_commit_sha="4" * 40,
+        network_isolated=True,
+    )
+    db_session.add(run)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_candidate_training_retention_is_database_disabled(db_session):
+    installation = ProviderInstallation(provider="github", external_installation_id="training-retention-install")
+    db_session.add(installation)
+    await db_session.flush()
+    repository = Repository(full_name="example/training-retention", provider_installation_id=installation.id)
+    db_session.add(repository)
+    await db_session.flush()
+
+    run = SandboxRun(
+        repository_id=repository.id,
+        provider_installation_id=installation.id,
+        trigger="manual",
+        source_commit_sha="5" * 40,
+    )
+    db_session.add(run)
+    await db_session.flush()
+
+    candidate = ModelCandidateFix(
+        sandbox_run_id=run.id,
+        provider="github",
+        candidate_diff="private tenant-scoped patch",
+        retained_for_training=True,
+    )
+    db_session.add(candidate)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
