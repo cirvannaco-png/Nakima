@@ -72,6 +72,10 @@ def upgrade() -> None:
             "synthetic_injection_used = false OR trigger = 'synthetic_injection'",
             name="ck_sandbox_runs_synthetic_trigger",
         ),
+        sa.CheckConstraint(
+            "network_isolated = false OR (container_id IS NOT NULL AND container_image IS NOT NULL)",
+            name="ck_sandbox_runs_isolation_evidence",
+        ),
     )
     op.execute(
         """
@@ -169,10 +173,18 @@ def upgrade() -> None:
             name="ck_model_candidate_fixes_status",
         ),
         sa.CheckConstraint(
+            "candidate_status NOT IN ('applied', 'tested', 'selected') OR applied_commit_sha IS NOT NULL",
+            name="ck_model_candidate_fixes_applied_has_commit",
+        ),
+        sa.CheckConstraint(
             "candidate_status NOT IN ('tested', 'selected') OR "
             "(test_suite_passed IS NOT NULL AND tested_at IS NOT NULL "
             "AND applied_commit_sha IS NOT NULL AND test_results IS NOT NULL)",
             name="ck_model_candidate_fixes_tested_has_result",
+        ),
+        sa.CheckConstraint(
+            "retained_for_training = false",
+            name="ck_model_candidate_fixes_training_retention_disabled",
         ),
         sa.CheckConstraint(
             "candidate_status != 'selected' OR test_suite_passed IS TRUE",
