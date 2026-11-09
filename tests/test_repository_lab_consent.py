@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from models.provider_installation import ProviderInstallation
 from models.repository import Repository
 
-
 @pytest.mark.asyncio
 async def test_legacy_repository_defaults_to_lab_opt_out(db_session):
     repository = Repository(full_name="example/legacy")
@@ -22,7 +21,6 @@ async def test_legacy_repository_defaults_to_lab_opt_out(db_session):
     assert stored.sandbox_lab_consented_at is None
     assert stored.sandbox_lab_consent_actor_id is None
     assert stored.sandbox_lab_consent_version is None
-
 
 @pytest.mark.asyncio
 async def test_lab_opt_in_requires_installation_and_complete_consent_record(db_session):
@@ -63,7 +61,6 @@ async def test_lab_opt_in_requires_installation_and_complete_consent_record(db_s
     assert stored.provider_installation_id == installation.id
     assert stored.sandbox_lab_consent_actor_id == "github-user:9001"
 
-
 @pytest.mark.asyncio
 async def test_external_installation_ids_are_namespaced_by_provider(db_session):
     github = ProviderInstallation(provider="github", external_installation_id="42")
@@ -78,8 +75,6 @@ async def test_external_installation_ids_are_namespaced_by_provider(db_session):
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
-
-
 
 @pytest.mark.asyncio
 async def test_github_repository_id_is_unique_across_canonical_rows(db_session):
