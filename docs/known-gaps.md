@@ -17,18 +17,27 @@ real vs. stubbed right now.
 
 ## API exposure and authorization blocker
 
-- The Lab FastAPI app in `orchestrator/main.py` is not mounted by the main
-  `api.router:app` and is not run by the current Compose services. The
-  production Dockerfile starts only `api.router:app`; the Compose
-  `sandbox` service only builds the runner image.
-- Keep the Lab app unexposed. It has no authenticated principal/tenant
-  membership dependency, takes UUID repository/organization identifiers
-  from the request, and accepts `reviewer_user_id` from the caller. A client
-  must never choose the reviewer identity or authorize its own tenant access.
-- Before mounting/deploying Lab endpoints, implement authentication,
-  installation-scoped membership/role checks, server-derived reviewer
-  identity, and authorization on run, read, review, and eventual PR-creation
-  operations.
+- The Lab FastAPI app in `orchestrator/main.py` remains unmounted and is not
+  run by the current Compose services. The production Dockerfile starts only
+  `api.router:app`; the Compose `sandbox` service only builds the runner image.
+- The Lab app now validates OIDC bearer JWTs against a configured issuer,
+  audience and HTTPS JWKS endpoint. It uses exact `(issuer, subject)` identity,
+  an environment allowlist for global operators, and audited memberships
+  scoped to individual provider installations. Roles separate run creation,
+  read access and human review. Caller-supplied reviewer IDs and UUID tenant
+  IDs have been removed.
+- Required deployment configuration is `LAB_OIDC_ISSUER`,
+  `LAB_OIDC_AUDIENCE`, `LAB_OIDC_JWKS_URL`, and
+  `LAB_OIDC_ADMIN_SUBJECTS`. No identity provider has been selected or
+  configured yet; the Lab endpoints must remain unexposed until real issuer,
+  audience, signing-key rotation and membership-provisioning flows are tested.
+- Run creation deliberately returns 503 even after authorization checks:
+  the safe host-side clone/archive transfer and complete runner lifecycle are
+  not implemented. This is an intentional release gate, not a transient error.
+- Installation deletion revokes all explicit memberships; suspension blocks
+  access through the inactive installation and preserves memberships for a
+  deliberate unsuspend. Never auto-provision membership from an email or
+  webhook payload.
 
 ## Stubbed, needs implementation before first live test
 
