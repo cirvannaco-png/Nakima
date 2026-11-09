@@ -47,9 +47,12 @@ chain and is explicitly marked deprecated and non-executable. Do not apply it.
 1. Resolve the canonical repository and provider installation from trusted,
    verified provider metadata.
 2. Obtain a narrowly scoped, read-only credential for that one repository.
-3. Clone the exact pinned commit on the trusted host; transfer a verified,
-   immutable source archive into a network-isolated container. Do not give the
-   sandbox a credential or network access.
+3. Fetch the exact commit via the GitHub API on the trusted host and verify
+   GitHub's returned commit SHA. The new `lab/source_bundle.py` helper then
+   downloads the archive without forwarding credentials to codeload, records
+   a SHA-256 digest, and rejects unsafe tar entries during extraction.
+4. Transfer only the immutable archive and digest into a network-isolated
+   container. Do not give the sandbox a credential, clone URL or network access.
 4. Run baseline checks and diagnostics.
 5. Generate candidate patches through configured provider adapters.
 6. Apply each candidate to its own clean worktree before running the full
@@ -82,9 +85,11 @@ chain and is explicitly marked deprecated and non-executable. Do not apply it.
   and exact repository-ID ownership before the workflow-token request. The
   separate workflow token itself remains unscoped until PR #95 is integrated.
 - The sandbox container is launched with `network_mode="none"`, while the
-  current entrypoint attempts to clone from GitHub inside the container.
-  Those requirements contradict each other. Host-side clone and immutable
-  transfer must replace in-container network access.
+  current entrypoint still attempts to clone from GitHub inside the container.
+  `lab/source_bundle.py` now provides the trusted-host pinned archive and
+  safe-extraction building block, but no orchestrator route invokes it and
+  the runner entrypoint has not yet been converted to consume the archive.
+  The two sides must be integrated before the Lab can run.
 - The orchestrator's requested image name does not match the image/tag built
   by CI; the Lab image and entrypoint need one authoritative build path.
 - `diagnose_failure` and `generate_candidate_fix` are not wired to real

@@ -68,6 +68,9 @@ ignore = ["E501", "S101", "S603", "S607", "S108"]
 "orchestrator/main.py" = ["B008"]
 "tests/*.py" = ["S105", "S106"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["lab"]
+
 [tool.bandit]
 exclude_dirs = ["tests", "alembic/versions"]
 skips = ["B101"]
