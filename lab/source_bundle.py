@@ -16,7 +16,6 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
-
 GITHUB_API = "https://api.github.com"
 ALLOWED_ARCHIVE_REDIRECT_HOST = "codeload.github.com"
 DEFAULT_MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
