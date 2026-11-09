@@ -271,4 +271,3 @@ async def require_active_github_repository_installation(
         repository.full_name = full_name
 
     return repository
-
