@@ -185,3 +185,88 @@ async def test_oidc_verifier_caches_jwks_document(signing_material):
     await verifier.verify(_token(private_key, subject="second"))
 
     assert verifier.fetch_count == 1
+
+
+
+@pytest.mark.asyncio
+async def test_oidc_verifier_refreshes_jwks_once_when_provider_rotates_key():
+    old_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    new_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old_numbers = old_private_key.public_key().public_numbers()
+    new_numbers = new_private_key.public_key().public_numbers()
+
+    old_jwks = {
+        "keys": [
+            {
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "kid": "old-key",
+                "n": _b64url_uint(old_numbers.n),
+                "e": _b64url_uint(old_numbers.e),
+            }
+        ]
+    }
+    new_jwks = {
+        "keys": [
+            {
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "kid": "rotated-key",
+                "n": _b64url_uint(new_numbers.n),
+                "e": _b64url_uint(new_numbers.e),
+            }
+        ]
+    }
+
+    class RotatingVerifier(OIDCVerifier):
+        def __init__(self, config):
+            super().__init__(config)
+            self.fetch_count = 0
+
+        async def _fetch_jwks(self, jwks_url: str) -> dict:
+            self.fetch_count += 1
+            return old_jwks if self.fetch_count == 1 else new_jwks
+
+    verifier = RotatingVerifier(_identity_config())
+    token = jwt.encode(
+        {
+            "iss": "https://identity.example.test/",
+            "aud": "nakima-lab-api",
+            "sub": "rotated-user",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300,
+        },
+        new_private_key,
+        algorithm="RS256",
+        headers={"kid": "rotated-key"},
+    )
+
+    principal = await verifier.verify(token)
+
+    assert principal.subject == "rotated-user"
+    assert verifier.fetch_count == 2
+
+
+@pytest.mark.asyncio
+async def test_oidc_verifier_requires_authorized_party_for_multiple_audiences(signing_material):
+    private_key, jwks = signing_material
+    verifier = StubJWKSVerifier(_identity_config(), jwks)
+    now = int(time.time())
+    token = jwt.encode(
+        {
+            "iss": "https://identity.example.test/",
+            "aud": ["nakima-lab-api", "other-api"],
+            "sub": "user-123",
+            "iat": now,
+            "exp": now + 300,
+            "azp": "other-client",
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "lab-test-key"},
+    )
+
+    with pytest.raises(InvalidLabToken):
+        await verifier.verify(token)
