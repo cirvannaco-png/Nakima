@@ -109,6 +109,9 @@ async def grant_installation_membership(
         active_membership.revocation_reason = "role_changed"
         active_membership.revoked_at = now
         active_membership.updated_at = now
+        # Release the partial unique active-grant index before inserting its
+        # replacement row in the same transaction.
+        await session.flush()
 
     membership = ProviderInstallationMembership(
         provider_installation_id=provider_installation_id,
