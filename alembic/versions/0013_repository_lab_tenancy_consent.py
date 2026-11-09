@@ -53,6 +53,11 @@ def upgrade() -> None:
         "repositories",
         ["provider_installation_id"],
     )
+    op.create_unique_constraint(
+        "uq_repositories_id_installation",
+        "repositories",
+        ["id", "provider_installation_id"],
+    )
 
     # Legacy repositories are opted out. Enabling Lab requires a complete,
     # auditable consent record and an attached provider installation.
@@ -91,6 +96,7 @@ def downgrade() -> None:
     op.drop_column("repositories", "sandbox_lab_consent_actor_id")
     op.drop_column("repositories", "sandbox_lab_consented_at")
     op.drop_column("repositories", "sandbox_lab_opt_in")
+    op.drop_constraint("uq_repositories_id_installation", "repositories", type_="unique")
     op.drop_index("ix_repositories_provider_installation_id", table_name="repositories")
     op.drop_constraint("fk_repositories_provider_installation_id", "repositories", type_="foreignkey")
     op.drop_column("repositories", "provider_installation_id")
