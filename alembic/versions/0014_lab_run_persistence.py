@@ -44,7 +44,6 @@ def upgrade() -> None:
             "expires_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("(now() + interval '24 hours')"),
         ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.CheckConstraint(
@@ -117,7 +116,7 @@ def upgrade() -> None:
             name="ck_model_candidate_fixes_tested_has_result",
         ),
         sa.CheckConstraint(
-            "candidate_status != 'selected' OR test_suite_passed = true",
+            "candidate_status != 'selected' OR test_suite_passed IS TRUE",
             name="ck_model_candidate_fixes_selected_passed",
         ),
     )
