@@ -287,3 +287,57 @@ async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_s
         _repository(88001, "example-org/renamed-service"),
     )
     assert repository.full_name == "example-org/renamed-service"
+
+
+
+@pytest.mark.asyncio
+async def test_orphaned_added_event_cannot_create_installation_or_repository(db_session):
+    result = await sync_github_installation_event(
+        db_session,
+        "installation_repositories",
+        {
+            "action": "added",
+            "installation": _installation("9997"),
+            "repositories_added": [_repository(99002, "example-org/orphan-added")],
+        },
+    )
+
+    installations = (await db_session.execute(select(ProviderInstallation))).scalars().all()
+    repositories = (await db_session.execute(select(Repository))).scalars().all()
+
+    assert result["status"] == "ignored"
+    assert installations == []
+    assert repositories == []
+
+
+@pytest.mark.asyncio
+async def test_deleted_event_never_reattaches_repositories_from_payload(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    repository = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88001))
+    assert repository is not None
+    installation_id = repository.provider_installation_id
+
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "deleted",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    await db_session.commit()
+    await db_session.refresh(repository)
+
+    assert repository.provider_installation_id is None
+    installation = await db_session.get(ProviderInstallation, installation_id)
+    assert installation is not None
+    assert installation.is_active is False
