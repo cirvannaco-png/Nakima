@@ -138,7 +138,6 @@ async def test_webhook_repository_upsert_fails_closed_without_stable_ids(monkeyp
         await engine.dispose()
 
 
-
 @pytest.mark.asyncio
 async def test_installation_account_identity_cannot_be_silently_changed(monkeypatch):
     engine, _ = await _wire_test_database(monkeypatch)
