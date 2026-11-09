@@ -174,8 +174,10 @@ async def sync_github_installation_event(
     if event_type == "installation_repositories" and action not in repository_actions:
         return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
 
-    if event_type == "installation_repositories" and action == "removed":
-        external_id = _external_id(installation_payload.get("id"), "installation id")
+    external_id = _external_id(installation_payload.get("id"), "installation id")
+    if event_type == "installation" and action == "created":
+        installation = await _get_or_create_installation(session, installation_payload)
+    else:
         result = await session.execute(
             select(ProviderInstallation).where(
                 ProviderInstallation.provider == "github",
@@ -184,11 +186,11 @@ async def sync_github_installation_event(
         )
         installation = result.scalar_one_or_none()
         if installation is None:
-            # Out-of-order removal events must not manufacture an active
-            # installation/tenant that was never registered locally.
+            # Only the signed installation.created event may create a tenant.
+            # Out-of-order repository or lifecycle events never manufacture one.
             return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
-    else:
-        installation = await _get_or_create_installation(session, installation_payload)
+        if event_type == "installation_repositories" and action == "added" and not installation.is_active:
+            return {"status": "ignored", "action": action, "repositories_added": 0, "repositories_removed": 0}
 
     if event_type == "installation":
         if action in {"created", "unsuspend", "new_permissions_accepted"}:
@@ -222,9 +224,10 @@ async def sync_github_installation_event(
 
         repository_items = payload.get("repositories") or []
         added = 0
-        for item in repository_items:
-            await _upsert_repository(session, installation, item)
-            added += 1
+        if action in {"created", "unsuspend", "new_permissions_accepted"} and installation.is_active:
+            for item in repository_items:
+                await _upsert_repository(session, installation, item)
+                added += 1
         return {"status": "synced", "action": action, "repositories_added": added, "repositories_removed": 0}
 
     if action == "added":
