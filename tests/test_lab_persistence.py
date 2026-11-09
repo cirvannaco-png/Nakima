@@ -1,3 +1,6 @@
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from datetime import UTC, datetime
 from sqlalchemy import select
@@ -223,3 +226,80 @@ async def test_tested_candidate_requires_commit_and_full_test_evidence(db_sessio
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_postgres_trigger_enforces_active_installation_and_synthetic_consent():
+    from sqlalchemy.exc import DBAPIError
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from core.config import settings
+
+    engine = create_async_engine(settings.DATABASE_URL)
+    try:
+        try:
+            async with engine.connect() as connection:
+                await connection.exec_driver_sql("SELECT 1")
+        except DBAPIError:
+            pytest.skip("PostgreSQL is not available for migration-trigger integration tests")
+
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            installation = ProviderInstallation(
+                provider="github",
+                external_installation_id=f"trigger-test-{uuid.uuid4()}",
+                is_active=True,
+            )
+            session.add(installation)
+            await session.flush()
+
+            repository = Repository(
+                full_name=f"example/trigger-{uuid.uuid4().hex}",
+                provider_installation_id=installation.id,
+            )
+            session.add(repository)
+            await session.commit()
+
+            invalid = SandboxRun(
+                repository_id=repository.id,
+                provider_installation_id=installation.id,
+                trigger="synthetic_injection",
+                source_commit_sha="2" * 40,
+                synthetic_injection_used=True,
+            )
+            session.add(invalid)
+            with pytest.raises(DBAPIError):
+                await session.commit()
+            await session.rollback()
+
+            repository.sandbox_lab_opt_in = True
+            repository.sandbox_lab_consented_at = datetime.now(UTC).replace(tzinfo=None)
+            repository.sandbox_lab_consent_actor_id = "test-user:tenant-owner"
+            repository.sandbox_lab_consent_version = "lab-consent-v1"
+            await session.commit()
+
+            valid = SandboxRun(
+                repository_id=repository.id,
+                provider_installation_id=installation.id,
+                trigger="synthetic_injection",
+                source_commit_sha="3" * 40,
+                synthetic_injection_used=True,
+            )
+            session.add(valid)
+            await session.commit()
+            assert valid.id is not None
+
+            # The run retains its original tenant snapshot when the provider
+            # later removes repository access and consent is revoked.
+            repository.provider_installation_id = None
+            repository.sandbox_lab_opt_in = False
+            repository.sandbox_lab_consented_at = None
+            repository.sandbox_lab_consent_actor_id = None
+            repository.sandbox_lab_consent_version = None
+            await session.commit()
+
+            stored = await session.get(SandboxRun, valid.id)
+            assert stored is not None
+            assert stored.provider_installation_id == installation.id
+    finally:
+        await engine.dispose()
