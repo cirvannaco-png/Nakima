@@ -38,6 +38,10 @@ class SandboxRun(Base):
             "synthetic_injection_used = false OR trigger = 'synthetic_injection'",
             name="ck_sandbox_runs_synthetic_trigger",
         ),
+        CheckConstraint(
+            "network_isolated = false OR (container_id IS NOT NULL AND container_image IS NOT NULL)",
+            name="ck_sandbox_runs_isolation_evidence",
+        ),
         Index("ix_sandbox_runs_repository_created", "repository_id", "created_at"),
         Index("ix_sandbox_runs_provider_installation_created", "provider_installation_id", "created_at"),
         Index("ix_sandbox_runs_status_expires", "status", "expires_at"),
@@ -126,10 +130,18 @@ class ModelCandidateFix(Base):
             name="ck_model_candidate_fixes_status",
         ),
         CheckConstraint(
+            "candidate_status NOT IN ('applied', 'tested', 'selected') OR applied_commit_sha IS NOT NULL",
+            name="ck_model_candidate_fixes_applied_has_commit",
+        ),
+        CheckConstraint(
             "candidate_status NOT IN ('tested', 'selected') OR "
             "(test_suite_passed IS NOT NULL AND tested_at IS NOT NULL "
             "AND applied_commit_sha IS NOT NULL AND test_results IS NOT NULL)",
             name="ck_model_candidate_fixes_tested_has_result",
+        ),
+        CheckConstraint(
+            "retained_for_training = false",
+            name="ck_model_candidate_fixes_training_retention_disabled",
         ),
         CheckConstraint(
             "candidate_status != 'selected' OR test_suite_passed IS TRUE",
