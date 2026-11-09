@@ -7,11 +7,11 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    ForeignKeyConstraint,
     Index,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,19 +38,18 @@ class SandboxRun(Base):
             "synthetic_injection_used = false OR trigger = 'synthetic_injection'",
             name="ck_sandbox_runs_synthetic_trigger",
         ),
-        ForeignKeyConstraint(
-            ["repository_id", "provider_installation_id"],
-            ["repositories.id", "repositories.provider_installation_id"],
-            ondelete="CASCADE",
-            name="fk_sandbox_runs_repository_tenant",
-        ),
         Index("ix_sandbox_runs_repository_created", "repository_id", "created_at"),
+        Index("ix_sandbox_runs_provider_installation_created", "provider_installation_id", "created_at"),
         Index("ix_sandbox_runs_status_expires", "status", "expires_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    repository_id: Mapped[int] = mapped_column(nullable=False)
-    provider_installation_id: Mapped[int] = mapped_column(nullable=False)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id", ondelete="RESTRICT"), nullable=False)
+    # Snapshot the owning installation at run creation. This remains stable
+    # if the provider later removes, suspends, or reassigns the repository.
+    provider_installation_id: Mapped[int] = mapped_column(
+        ForeignKey("provider_installations.id", ondelete="RESTRICT"), nullable=False
+    )
     trigger: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", server_default="queued")
     source_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -71,7 +70,7 @@ class SandboxRun(Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(UTC) + timedelta(hours=24),
+        default=lambda: datetime.now(UTC) + timedelta(hours=2),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -80,9 +79,10 @@ class SandboxRun(Base):
         server_default=func.now(),
     )
 
-    repository = relationship("Repository", foreign_keys=[repository_id, provider_installation_id])
+    repository = relationship("Repository", foreign_keys=[repository_id])
     reviews = relationship("RunReview", back_populates="sandbox_run", cascade="all, delete-orphan")
     candidates = relationship("ModelCandidateFix", back_populates="sandbox_run", cascade="all, delete-orphan")
+    provider_installation = relationship("ProviderInstallation")
 
 
 class RunReview(Base):
@@ -114,12 +114,21 @@ class ModelCandidateFix(Base):
     __tablename__ = "model_candidate_fixes"
     __table_args__ = (
         Index("ix_model_candidate_fixes_run", "sandbox_run_id"),
+        Index(
+            "uq_model_candidate_fixes_one_selected_per_run",
+            "sandbox_run_id",
+            unique=True,
+            postgresql_where=text("candidate_status = 'selected'"),
+            sqlite_where=text("candidate_status = 'selected'"),
+        ),
         CheckConstraint(
             "candidate_status IN ('proposed', 'applied', 'tested', 'rejected', 'selected')",
             name="ck_model_candidate_fixes_status",
         ),
         CheckConstraint(
-            "candidate_status NOT IN ('tested', 'selected') OR test_suite_passed IS NOT NULL",
+            "candidate_status NOT IN ('tested', 'selected') OR "
+            "(test_suite_passed IS NOT NULL AND tested_at IS NOT NULL "
+            "AND applied_commit_sha IS NOT NULL AND test_results IS NOT NULL)",
             name="ck_model_candidate_fixes_tested_has_result",
         ),
         CheckConstraint(
@@ -140,6 +149,8 @@ class ModelCandidateFix(Base):
         String(16), nullable=False, default="proposed", server_default="proposed"
     )
     test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    applied_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     retained_for_training: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
