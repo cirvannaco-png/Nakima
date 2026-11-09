@@ -48,8 +48,9 @@ class SandboxRun(Base):
     source_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
     container_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     container_image: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    result_schema_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     diagnosis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     proposed_fix_diff: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_models_consulted: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -105,6 +106,14 @@ class ModelCandidateFix(Base):
             "candidate_status IN ('proposed', 'applied', 'tested', 'rejected', 'selected')",
             name="ck_model_candidate_fixes_status",
         ),
+        CheckConstraint(
+            "candidate_status NOT IN ('tested', 'selected') OR test_suite_passed IS NOT NULL",
+            name="ck_model_candidate_fixes_tested_has_result",
+        ),
+        CheckConstraint(
+            "candidate_status != 'selected' OR test_suite_passed = true",
+            name="ck_model_candidate_fixes_selected_passed",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -118,7 +127,6 @@ class ModelCandidateFix(Base):
     candidate_status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed")
     test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     retained_for_training: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
