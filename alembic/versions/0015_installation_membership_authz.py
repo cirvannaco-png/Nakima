@@ -50,6 +50,11 @@ def upgrade() -> None:
             "length(principal_issuer) > 0 AND length(principal_subject) > 0",
             name="ck_installation_membership_principal",
         ),
+        sa.CheckConstraint(
+            "is_active = true OR (revoked_at IS NOT NULL AND "
+            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL)",
+            name="ck_installation_membership_revocation_audit",
+        ),
     )
     op.create_index(
         "ix_installation_membership_active_role",
