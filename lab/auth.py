@@ -48,6 +48,8 @@ class OIDCVerifier:
         jwks_url = self.config.LAB_OIDC_JWKS_URL
         if not issuer or not audience or not jwks_url:
             raise LabOIDCNotConfigured("Lab OIDC is not fully configured")
+        if len(issuer) > 512:
+            raise LabOIDCNotConfigured("The configured OIDC issuer exceeds the supported length")
 
         issuer_parsed = urlparse(issuer)
         parsed = urlparse(jwks_url)
@@ -65,8 +67,16 @@ class OIDCVerifier:
             raise LabOIDCNotConfigured("The configured OIDC issuer must use HTTPS")
         if parsed.scheme != "https" and not local_http_allowed:
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint must use HTTPS")
-        if parsed.username or parsed.password or not parsed.hostname:
+        if (
+            parsed.username
+            or parsed.password
+            or not parsed.hostname
+            or parsed.query
+            or parsed.fragment
+        ):
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint is invalid")
+        if issuer_parsed.username or issuer_parsed.password or not issuer_parsed.hostname or issuer_parsed.query or issuer_parsed.fragment:
+            raise LabOIDCNotConfigured("The configured OIDC issuer URL is invalid")
         return issuer, audience, jwks_url
 
     async def _fetch_jwks(self, jwks_url: str) -> dict:
