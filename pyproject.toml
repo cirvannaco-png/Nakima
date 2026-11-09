@@ -29,7 +29,7 @@ optional-dependencies.dev = { file = ["requirements-dev.txt"] }
 where = ["."]
 include = [
   "agents*", "api*", "core*", "database*", "documents*", "execution*",
-  "githubapp*", "intelligence*", "memory*", "models*", "monitoring*",
+  "githubapp*", "intelligence*", "lab*", "memory*", "models*", "monitoring*",
   "neis*", "orchestrator*", "planner*", "providers*", "quality*",
   "reports*", "repository*", "security*", "utils*", "validation*",
   "deploy_agent*",
