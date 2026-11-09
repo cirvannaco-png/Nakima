@@ -36,9 +36,7 @@ class Repository(Base):
     # Internal provider-installation row is the tenant boundary. The
     # external provider identifier is stored on that row, never used as a
     # cross-provider primary key. Legacy repositories remain unassigned.
-    provider_installation_id: Mapped[int | None] = mapped_column(
-        ForeignKey("provider_installations.id"), nullable=True
-    )
+    provider_installation_id: Mapped[int | None] = mapped_column(ForeignKey("provider_installations.id"), nullable=True)
 
     # Synthetic vulnerability injection and other Lab-only actions require
     # explicit, auditable repository consent. A missing/incomplete record
