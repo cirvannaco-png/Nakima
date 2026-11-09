@@ -50,7 +50,7 @@ class SandboxRun(Base):
     container_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     container_image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     result_schema_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     diagnosis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     proposed_fix_diff: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -131,11 +131,12 @@ class ModelCandidateFix(Base):
     test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
-    retained_for_training: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    retained_for_training: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
+        server_default=func.now(),
     )
 
     sandbox_run = relationship("SandboxRun", back_populates="candidates")
