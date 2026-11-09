@@ -98,18 +98,34 @@ class TestSuiteRunner:
     and passes the right runner in.
     """
 
-    def __init__(self, run_command: list[str], cwd: str):
+    def __init__(
+        self,
+        run_command: list[str],
+        cwd: str,
+        run_as_uid: int | None = None,
+        run_as_gid: int | None = None,
+    ):
         self.run_command = run_command
         self.cwd = cwd
+        self.run_as_uid = run_as_uid
+        self.run_as_gid = run_as_gid
 
     def run(self, timeout_seconds: int = 600) -> tuple[bool, str]:
         try:
+            run_options = {}
+            if self.run_as_uid is not None or self.run_as_gid is not None:
+                if self.run_as_uid is None or self.run_as_gid is None:
+                    raise ValueError("Both run_as_uid and run_as_gid must be provided together")
+                run_options["user"] = self.run_as_uid
+                run_options["group"] = self.run_as_gid
+                run_options["extra_groups"] = []
             result = subprocess.run(
                 self.run_command,
                 cwd=self.cwd,
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
+                **run_options,
             )
             passed = result.returncode == 0
             output = (result.stdout or "") + "\n" + (result.stderr or "")
