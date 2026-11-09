@@ -49,11 +49,7 @@ async def test_fetch_pinned_bundle_checks_commit_and_never_forwards_token_to_cod
         if request.url.host == "api.github.com" and request.url.path.endswith(f"/tarball/{COMMIT_SHA}"):
             return httpx.Response(
                 302,
-                headers={
-                    "location": (
-                        f"https://codeload.github.com/owner/repo/legacy.tar.gz/{COMMIT_SHA}"
-                    )
-                },
+                headers={"location": (f"https://codeload.github.com/owner/repo/legacy.tar.gz/{COMMIT_SHA}")},
             )
         if request.url.host == "codeload.github.com":
             return httpx.Response(200, content=archive_bytes)
@@ -151,7 +147,6 @@ def test_extract_rejects_archive_digest_mismatch(tmp_path):
         extract_verified_source_bundle(archive, tmp_path / "workspace")
     assert not (tmp_path / "workspace").exists()
 
-
 def test_extract_rejects_path_traversal_without_creating_workspace(tmp_path):
     archive = _bundle_from_bytes(
         tmp_path,
@@ -195,11 +190,7 @@ async def test_fetch_rejects_codeload_path_for_another_repository(tmp_path):
             return httpx.Response(200, json={"sha": COMMIT_SHA})
         return httpx.Response(
             302,
-            headers={
-                "location": (
-                    f"https://codeload.github.com/attacker/other/legacy.tar.gz/{COMMIT_SHA}"
-                )
-            },
+            headers={"location": (f"https://codeload.github.com/attacker/other/legacy.tar.gz/{COMMIT_SHA}")},
         )
 
     with pytest.raises(SourceBundleError, match="untrusted"):
