@@ -1,0 +1,130 @@
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database.base import Base
+
+
+class SandboxRun(Base):
+    __tablename__ = "sandbox_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "trigger IN ('ci_failure', 'cve_scan', 'synthetic_injection', 'manual')",
+            name="ck_sandbox_runs_trigger",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'provisioning', 'running', 'awaiting_review', "
+            "'approved', 'rejected', 'expired', 'failed')",
+            name="ck_sandbox_runs_status",
+        ),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN "
+            "('fix_correct', 'fix_incorrect', 'no_fix_found', 'user_rejected')",
+            name="ck_sandbox_runs_outcome",
+        ),
+        CheckConstraint(
+            "synthetic_injection_used = false OR trigger = 'synthetic_injection'",
+            name="ck_sandbox_runs_synthetic_trigger",
+        ),
+        Index("ix_sandbox_runs_repository_created", "repository_id", "created_at"),
+        Index("ix_sandbox_runs_status_expires", "status", "expires_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    trigger: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    source_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    container_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    container_image: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    diagnosis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    proposed_fix_diff: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_models_consulted: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    full_test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC) + timedelta(hours=24),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    repository = relationship("Repository")
+    reviews = relationship("RunReview", back_populates="sandbox_run", cascade="all, delete-orphan")
+    candidates = relationship("ModelCandidateFix", back_populates="sandbox_run", cascade="all, delete-orphan")
+
+
+class RunReview(Base):
+    __tablename__ = "run_reviews"
+    __table_args__ = (
+        CheckConstraint("decision IN ('approved', 'rejected')", name="ck_run_reviews_decision"),
+        Index("ix_run_reviews_run_reviewed", "sandbox_run_id", "reviewed_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    sandbox_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sandbox_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    reviewed_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    sandbox_run = relationship("SandboxRun", back_populates="reviews")
+
+
+class ModelCandidateFix(Base):
+    __tablename__ = "model_candidate_fixes"
+    __table_args__ = (
+        Index("ix_model_candidate_fixes_run", "sandbox_run_id"),
+        CheckConstraint(
+            "candidate_status IN ('proposed', 'applied', 'tested', 'rejected', 'selected')",
+            name="ck_model_candidate_fixes_status",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    sandbox_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sandbox_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    candidate_diff: Mapped[str] = mapped_column(Text, nullable=False)
+    candidate_status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed")
+    test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retained_for_training: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    sandbox_run = relationship("SandboxRun", back_populates="candidates")
