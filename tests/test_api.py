@@ -78,7 +78,6 @@ def test_webhook_valid_signature_reaches_auth_and_fails_cleanly():
     assert "Could not authenticate" in r.json()["detail"]
 
 
-
 def test_github_app_manifest_requests_only_workflow_permissions():
     from githubapp.setup import _MANIFEST
 
