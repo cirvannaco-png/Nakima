@@ -25,6 +25,8 @@ def upgrade() -> None:
         sa.Column("account_external_id", sa.String(length=255), nullable=True),
         sa.Column("account_login", sa.String(length=255), nullable=True),
         sa.Column("account_type", sa.String(length=32), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("deactivated_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.UniqueConstraint(
