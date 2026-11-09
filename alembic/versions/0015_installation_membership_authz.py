@@ -28,6 +28,7 @@ def upgrade() -> None:
         sa.Column("granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("revoked_by_issuer", sa.String(length=512), nullable=True),
         sa.Column("revoked_by_subject", sa.String(length=255), nullable=True),
+        sa.Column("revocation_reason", sa.String(length=64), nullable=True),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.ForeignKeyConstraint(
@@ -35,12 +36,6 @@ def upgrade() -> None:
             ["provider_installations.id"],
             ondelete="RESTRICT",
             name="fk_installation_membership_provider_installation",
-        ),
-        sa.UniqueConstraint(
-            "provider_installation_id",
-            "principal_issuer",
-            "principal_subject",
-            name="uq_installation_membership_principal",
         ),
         sa.CheckConstraint(
             "role IN ('owner', 'admin', 'maintainer', 'reviewer', 'viewer')",
@@ -52,7 +47,8 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "is_active = true OR (revoked_at IS NOT NULL AND "
-            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL)",
+            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL "
+            "AND revocation_reason IS NOT NULL)",
             name="ck_installation_membership_revocation_audit",
         ),
     )
@@ -61,9 +57,21 @@ def upgrade() -> None:
         "provider_installation_memberships",
         ["provider_installation_id", "is_active", "role"],
     )
+    op.create_index(
+        "uq_installation_membership_active_principal",
+        "provider_installation_memberships",
+        ["provider_installation_id", "principal_issuer", "principal_subject"],
+        unique=True,
+        postgresql_where=sa.text("is_active = true"),
+        sqlite_where=sa.text("is_active = 1"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "uq_installation_membership_active_principal",
+        table_name="provider_installation_memberships",
+    )
     op.drop_index(
         "ix_installation_membership_active_role",
         table_name="provider_installation_memberships",
