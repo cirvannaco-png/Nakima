@@ -78,3 +78,17 @@ async def test_external_installation_ids_are_namespaced_by_provider(db_session):
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
+
+
+
+@pytest.mark.asyncio
+async def test_github_repository_id_is_unique_across_canonical_rows(db_session):
+    db_session.add_all(
+        [
+            Repository(full_name="example/first", github_repo_id=123456),
+            Repository(full_name="example/duplicate", github_repo_id=123456),
+        ]
+    )
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
