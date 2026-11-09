@@ -1,14 +1,25 @@
 # Known Gaps — Nakima Lab / Sandbox / Self-Healing v0.1
 
+> **Release status:** not production-ready. The Lab is a scaffold, not an operational security boundary. See issue #94.
+
 Explicit per Directive: undocumented gaps are liabilities. This is what's
 real vs. stubbed right now.
 
+## Database identity and tenant foundation
+
+- Migration `0013` adds a provider-neutral `provider_installations` table and links the existing integer-keyed `repositories` rows to an internal installation ID. External provider IDs are stored as strings and uniquely scoped by provider.
+- Legacy repositories remain unattached and Lab-opted-out. A database CHECK constraint requires an installation, consent timestamp, actor identifier, and consent version before opt-in.
+- This does not create `sandbox_runs` or `run_reviews`, and it does not yet connect verified webhook metadata to provider-installation rows. Those are still required before a run can be authorized or persisted.
+- `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
+
 ## Stubbed, needs implementation before first live test
 
-- `orchestrator/main.py::_repo_has_lab_consent` — reads a placeholder; must
-  wire to `repositories.sandbox_lab_opt_in`.
-- `orchestrator/main.py::_resolve_clone_url` — must issue a **read-only**,
-  repo-scoped GitHub App installation token. Never the org PAT. Never write scope.
+- `orchestrator/main.py::_repo_has_lab_consent` — still a placeholder; must
+  query the canonical repository row and fail closed unless the consent record
+  is complete and the caller is authorized for its provider installation.
+- `orchestrator/main.py::_resolve_clone_url` — must resolve a verified
+  provider installation and issue a **read-only**, single-repository token.
+  Never pass the workflow token or an org-wide PAT to the sandbox.
 - `orchestrator/main.py::_await_container_completion` — needs real container
   log polling + a defined structured JSON contract the sandbox entrypoint
   writes before exit (schema TBD, should live in `sandbox_image/`).
@@ -45,6 +56,9 @@ real vs. stubbed right now.
 
 ## Security items requiring sign-off before first live test with real user repos
 
+- Replace in-container cloning: the current entrypoint needs network access
+  while the orchestrator disables container networking. Clone on the trusted
+  host at the pinned commit, then transfer a verified immutable archive.
 - Confirm sandbox container truly has `network_mode="none"` end-to-end (no
   sidecar, no DNS resolution path that leaks out).
 - Confirm the GitHub App installation token scoping is actually read-only at
