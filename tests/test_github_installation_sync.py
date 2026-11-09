@@ -209,9 +209,7 @@ async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
         {"action": "unexpected", "installation": _installation("9998")},
     )
 
-    installations = (
-        await db_session.execute(select(ProviderInstallation))
-    ).scalars().all()
+    installations = (await db_session.execute(select(ProviderInstallation))).scalars().all()
 
     assert result["status"] == "ignored"
     assert installations == []
