@@ -122,6 +122,7 @@ async def test_global_operator_can_grant_and_revoke_membership_with_audit(
 
     assert revoked.is_active is False
     assert revoked.revoked_by_subject == "operator-1"
+    assert revoked.revocation_reason == "operator_revoked"
     assert revoked.revoked_at is not None
     with pytest.raises(HTTPException):
         await require_installation_role(db_session, installation.id, principals["maintainer"], READ_ROLES)
@@ -216,3 +217,40 @@ async def test_role_change_creates_a_new_grant_and_preserves_revocation_history(
         )
     ).scalars().all()
     assert len(history) == 2
+
+
+
+@pytest.mark.asyncio
+async def test_regrant_same_role_is_idempotent(db_session, principals):
+    installation = ProviderInstallation(provider="github", external_installation_id="membership-idempotent")
+    db_session.add(installation)
+    await db_session.flush()
+
+    first = await grant_installation_membership(
+        db_session,
+        installation.id,
+        principals["maintainer"].subject,
+        "maintainer",
+        principals["operator"],
+    )
+    await db_session.commit()
+
+    second = await grant_installation_membership(
+        db_session,
+        installation.id,
+        principals["maintainer"].subject,
+        "maintainer",
+        principals["operator"],
+    )
+    await db_session.commit()
+
+    records = (
+        await db_session.execute(
+            select(ProviderInstallationMembership).where(
+                ProviderInstallationMembership.provider_installation_id == installation.id,
+                ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+            )
+        )
+    ).scalars().all()
+    assert first.id == second.id
+    assert len(records) == 1
