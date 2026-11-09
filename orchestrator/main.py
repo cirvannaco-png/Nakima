@@ -12,7 +12,7 @@ import uuid
 from enum import StrEnum
 from typing import Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,7 +164,7 @@ async def delete_installation_membership(
     return _membership_response(membership)
 
 
-@app.post("/lab/runs", response_model=SandboxRunHandle, status_code=status.HTTP_202_ACCEPTED)
+@app.post("/lab/runs", response_model=SandboxRunHandle)
 async def create_sandbox_run(
     req: SandboxRunRequest,
     principal: LabPrincipal = Depends(get_current_lab_principal),
