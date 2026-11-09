@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +28,7 @@ class Repository(Base):
             name="ck_repositories_lab_consent_complete",
         ),
         Index("ix_repositories_provider_installation_id", "provider_installation_id"),
+        UniqueConstraint("id", "provider_installation_id", name="uq_repositories_id_installation"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
