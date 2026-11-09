@@ -185,3 +185,29 @@ def test_extract_rejects_multiple_archive_roots(tmp_path):
 
     with pytest.raises(SourceBundleError, match="exactly one root"):
         extract_verified_source_bundle(bundle, tmp_path / "workspace")
+
+
+
+@pytest.mark.asyncio
+async def test_fetch_rejects_codeload_path_for_another_repository(tmp_path):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith(f"/commits/{COMMIT_SHA}"):
+            return httpx.Response(200, json={"sha": COMMIT_SHA})
+        return httpx.Response(
+            302,
+            headers={
+                "location": (
+                    f"https://codeload.github.com/attacker/other/legacy.tar.gz/{COMMIT_SHA}"
+                )
+            },
+        )
+
+    with pytest.raises(SourceBundleError, match="untrusted"):
+        await fetch_pinned_github_bundle(
+            "owner/repo",
+            COMMIT_SHA,
+            "test-token",
+            tmp_path / "source.tar.gz",
+            transport=httpx.MockTransport(handler),
+        )
+    assert not (tmp_path / "source.tar.gz").exists()
