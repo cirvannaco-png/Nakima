@@ -182,3 +182,39 @@ async def test_malformed_added_repository_fails_closed(db_session):
             },
         )
     await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_orphaned_removal_does_not_create_an_installation(db_session):
+    result = await sync_github_installation_event(
+        db_session,
+        "installation_repositories",
+        {
+            "action": "removed",
+            "installation": _installation("9999"),
+            "repositories_removed": [_repository(99001, "example-org/orphan")],
+        },
+    )
+
+    installations = (
+        await db_session.execute(select(ProviderInstallation))
+    ).scalars().all()
+
+    assert result["status"] == "ignored"
+    assert installations == []
+
+
+@pytest.mark.asyncio
+async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
+    result = await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "unexpected", "installation": _installation("9998")},
+    )
+
+    installations = (
+        await db_session.execute(select(ProviderInstallation))
+    ).scalars().all()
+
+    assert result["status"] == "ignored"
+    assert installations == []
