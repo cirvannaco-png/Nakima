@@ -21,6 +21,7 @@ class WebhookEvent:
     event_type: str
     payload: dict
     installation_id: int
+    repository_id: int | None
     repo_full_name: str | None  # None for installation-level events (e.g. "installation")
 
 
@@ -49,11 +50,13 @@ async def verify_webhook(request: Request) -> WebhookEvent:
         raise HTTPException(status_code=400, detail="Payload missing installation id")
 
     event_type = request.headers.get("X-GitHub-Event", "unknown")
+    repository_id = payload.get("repository", {}).get("id")
     repo_full_name = payload.get("repository", {}).get("full_name")
 
     return WebhookEvent(
         event_type=event_type,
         payload=payload,
         installation_id=int(installation_id),
+        repository_id=int(repository_id) if repository_id is not None else None,
         repo_full_name=repo_full_name,
     )
