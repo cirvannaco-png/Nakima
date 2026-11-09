@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import select
 from fastapi import HTTPException
 
 from lab.auth import LabPrincipal
@@ -167,3 +168,51 @@ async def test_inactive_installation_denies_even_active_membership(db_session, p
     with pytest.raises(HTTPException) as denied:
         await require_installation_role(db_session, installation.id, principals["maintainer"], READ_ROLES)
     assert denied.value.status_code == 403
+
+
+
+@pytest.mark.asyncio
+async def test_role_change_creates_a_new_grant_and_preserves_revocation_history(
+    db_session, principals
+):
+    installation = ProviderInstallation(provider="github", external_installation_id="membership-role-history")
+    db_session.add(installation)
+    await db_session.flush()
+
+    original = await grant_installation_membership(
+        db_session,
+        installation.id,
+        principals["maintainer"].subject,
+        "viewer",
+        principals["operator"],
+    )
+    await db_session.commit()
+
+    promoted = await grant_installation_membership(
+        db_session,
+        installation.id,
+        principals["maintainer"].subject,
+        "maintainer",
+        principals["operator"],
+    )
+    await db_session.commit()
+
+    assert promoted.id != original.id
+    assert promoted.role == "maintainer"
+    assert promoted.is_active is True
+    assert original.is_active is False
+    assert original.revocation_reason == "role_changed"
+    assert original.revoked_by_subject == "operator-1"
+    assert original.revoked_at is not None
+
+    history = (
+        await db_session.execute(
+            select(ProviderInstallationMembership)
+            .where(
+                ProviderInstallationMembership.provider_installation_id == installation.id,
+                ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+            )
+            .order_by(ProviderInstallationMembership.id)
+        )
+    ).scalars().all()
+    assert len(history) == 2
