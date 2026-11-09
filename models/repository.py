@@ -47,3 +47,4 @@ class Repository(Base):
     )
 
     tasks = relationship("Task", back_populates="repository")
+    provider_installation = relationship("ProviderInstallation", back_populates="repositories")
