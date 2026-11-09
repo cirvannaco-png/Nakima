@@ -140,7 +140,7 @@ def upgrade() -> None:
             sa.ForeignKey("sandbox_runs.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("reviewed_by", sa.String(length=255), nullable=False),
+        sa.Column("reviewed_by", sa.String(length=768), nullable=False),
         sa.Column("decision", sa.String(length=16), nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
