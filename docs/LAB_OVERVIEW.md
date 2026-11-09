@@ -26,15 +26,21 @@ The existing application schema is authoritative:
   These events do not mint or receive an automation token.
 - `repositories.provider_installation_id` associates a repository with its
   provider installation. Existing rows remain unattached until verified.
+- `provider_installation_memberships` binds an exact OIDC `(issuer, subject)`
+  pair to one provider installation and one explicit role. Membership grants
+  are allowlisted by a global Lab operator; membership revocation is audited.
+  Email addresses and caller-supplied user IDs are not authorization keys.
 - Lab consent is stored on the canonical repository row. Legacy rows default
   to opted out. A database CHECK constraint prevents opt-in unless the
   installation, timestamp, actor, and consent-version are all present.
 
-Migration `0013` adds only the provider-neutral installation and repository
-consent foundation. Durable run, candidate, and review tables are a separate
-next step and are not in the migration chain yet. The old `db/schema.sql`
-UUID-based repository schema was never part of the Alembic chain and is now
-explicitly marked deprecated and non-executable. Do not apply it.
+Migrations `0013`–`0016` define provider installation ownership, repository
+consent, durable runs/candidates/reviews, installation membership, and
+full OIDC reviewer-subject storage. A run keeps a snapshot of the owning
+installation using separate restrictive foreign keys; a PostgreSQL trigger
+checks the current repository-to-installation link at run creation. The old
+`db/schema.sql` UUID-based repository schema was never part of the Alembic
+chain and is explicitly marked deprecated and non-executable. Do not apply it.
 
 ## Target lifecycle (not yet implemented end to end)
 
@@ -59,12 +65,12 @@ explicitly marked deprecated and non-executable. Do not apply it.
   `docker-compose.yml`. The current production Dockerfile starts only
   `api.router:app`. Lab endpoints are therefore not part of the deployed
   Nakima API.
-- Do not expose or mount that app yet: its request contract still accepts
-  caller-supplied UUID repository/organization IDs, and the review endpoint
-  accepts a caller-supplied reviewer ID. There is no authenticated Lab
-  principal or tenant-membership authorization dependency. Exposing it as
-  written would allow spoofed reviewer identities and unauthorized run
-  requests.
+- Do not expose or mount that app yet. The Lab routes now require OIDC bearer
+  verification and installation-scoped roles, use the canonical integer
+  repository ID, and derive reviewer identity from the verified principal.
+  However, this app is still a separate unmounted service, and end-to-end
+  authentication/authorization has not been validated against a selected
+  production identity provider.
 - `orchestrator/main.py` also uses an in-memory run registry and contains
   unimplemented consent, clone-resolution, result-polling, and persistence
   functions. Its request contract does not yet use the canonical integer
@@ -83,13 +89,12 @@ explicitly marked deprecated and non-executable. Do not apply it.
 - `diagnose_failure` and `generate_candidate_fix` are not wired to real
   provider calls. The current candidate loop also needs to apply each patch
   before testing it; otherwise it can validate the unchanged baseline.
-- Migrations `0014` and ORM models define `sandbox_runs`,
-  `run_reviews`, and per-provider `model_candidate_fixes`. Runs are bound
-  to the canonical repository and provider installation through a composite
-  foreign key; a database trigger checks synthetic-injection consent.
-  The orchestrator still uses an in-memory registry and does not write/read
-  these tables; there is no tenant-scoped result API or end-to-end consent
-  workflow.
+- The ORM/migrations define `sandbox_runs`, `run_reviews`, and
+  `model_candidate_fixes`. Runs retain a canonical repository ID and an
+  installation snapshot; database triggers check active ownership and
+  synthetic-injection consent at insert/update. The Lab routes can read and
+  review durable rows under installation-scoped roles, but no safe runner
+  lifecycle creates and completes those rows yet.
 - Container completion, malformed result handling, timeouts, cancellation,
   teardown and terminal-state persistence are not complete.
 
@@ -98,12 +103,14 @@ acceptance gates.
 
 ## Authentication and deployment gate
 
-Before exposing any Lab API, implement authenticated user identity and
-installation-scoped tenant membership. Derive the reviewer ID from the
-authenticated principal; never accept it as an authority-bearing request
-field. Enforce membership/role checks on run creation, result reads, review,
-and any later PR-creation endpoint. Keep the Lab service unmounted until
-these checks and integration tests pass.
+The Lab API now has a generic OIDC verifier (issuer, audience, HTTPS JWKS),
+an explicit operator subject allowlist, auditable installation-scoped
+membership grants, role checks on run/read/review, and server-derived reviewer
+identity. Configure `LAB_OIDC_ISSUER`, `LAB_OIDC_AUDIENCE`,
+`LAB_OIDC_JWKS_URL`, and `LAB_OIDC_ADMIN_SUBJECTS` with a chosen production
+identity provider before deployment. Keep the Lab service unmounted until
+provider-backed login, operator provisioning, membership lifecycle and
+end-to-end authorization tests pass.
 
 ## Safety rule
 
