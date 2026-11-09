@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +43,8 @@ class RunTrigger(StrEnum):
 
 
 class SandboxRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # Use Nakima's canonical integer repository key. The former caller-
     # supplied UUID repository/organization pair belonged to the abandoned
     # second schema and could not be resolved against the application DB.
@@ -69,11 +71,15 @@ class SandboxRunHandle(BaseModel):
 
 
 class RunReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     decision: Literal["approved", "rejected"]
     notes: str = Field(default="", max_length=4000)
 
 
 class MembershipGrantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     subject: str = Field(min_length=1, max_length=255)
     role: Literal["owner", "admin", "maintainer", "reviewer", "viewer"]
 
