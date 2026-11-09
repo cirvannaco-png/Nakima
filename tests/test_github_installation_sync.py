@@ -341,3 +341,39 @@ async def test_deleted_event_never_reattaches_repositories_from_payload(db_sessi
     installation = await db_session.get(ProviderInstallation, installation_id)
     assert installation is not None
     assert installation.is_active is False
+
+
+@pytest.mark.asyncio
+async def test_suspended_installation_rejects_repository_addition(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "suspend", "installation": _installation()},
+    )
+    await db_session.commit()
+
+    result = await sync_github_installation_event(
+        db_session,
+        "installation_repositories",
+        {
+            "action": "added",
+            "installation": _installation(),
+            "repositories_added": [_repository(88002, "example-org/suspended-addition")],
+        },
+    )
+    await db_session.commit()
+
+    suspended_addition = await db_session.scalar(
+        select(Repository).where(Repository.github_repo_id == 88002)
+    )
+    assert result["status"] == "ignored"
+    assert suspended_addition is None
