@@ -57,7 +57,14 @@ class StubJWKSVerifier(OIDCVerifier):
         return self.document
 
 
-def _token(private_key, *, issuer="https://identity.example.test/", audience="nakima-lab-api", subject="user-123", exp=None):
+def _token(
+    private_key,
+    *,
+    issuer="https://identity.example.test/",
+    audience="nakima-lab-api",
+    subject="user-123",
+    exp=None,
+):
     now = int(time.time())
     claims = {
         "iss": issuer,
