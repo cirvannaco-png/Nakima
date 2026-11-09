@@ -214,7 +214,7 @@ async def sync_github_installation_event(
                         ProviderInstallationMembership.is_active.is_(True),
                     )
                 )
-                revoked_at = _now_utc_naive()
+                revoked_at = datetime.now(UTC)
                 for membership in membership_result.scalars():
                     membership.is_active = False
                     membership.revoked_by_issuer = "urn:nakima:system"
