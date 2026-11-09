@@ -3,7 +3,10 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import select
 
-from githubapp.installation_sync import sync_github_installation_event
+from githubapp.installation_sync import (
+    require_active_github_repository_installation,
+    sync_github_installation_event,
+)
 from models.provider_installation import ProviderInstallation
 from models.repository import Repository
 
@@ -212,3 +215,63 @@ async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
 
     assert result["status"] == "ignored"
     assert installations == []
+
+
+
+@pytest.mark.asyncio
+async def test_normal_repository_webhook_requires_existing_active_installation_link(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+
+    repository = await require_active_github_repository_installation(
+        db_session,
+        _installation(),
+        _repository(),
+    )
+    assert repository.github_repo_id == 88001
+
+    with pytest.raises(ValueError, match="not registered or is inactive"):
+        await require_active_github_repository_installation(
+            db_session,
+            _installation("7002"),
+            _repository(),
+        )
+
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {"action": "suspend", "installation": _installation()},
+    )
+    with pytest.raises(ValueError, match="not registered or is inactive"):
+        await require_active_github_repository_installation(
+            db_session,
+            _installation(),
+            _repository(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_session):
+    await sync_github_installation_event(
+        db_session,
+        "installation",
+        {
+            "action": "created",
+            "installation": _installation(),
+            "repositories": [_repository()],
+        },
+    )
+
+    repository = await require_active_github_repository_installation(
+        db_session,
+        _installation(),
+        _repository(88001, "example-org/renamed-service"),
+    )
+    assert repository.full_name == "example-org/renamed-service"
