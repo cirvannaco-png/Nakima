@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base
@@ -28,6 +28,8 @@ class ProviderInstallation(Base):
     account_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_login: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(UTC).replace(tzinfo=None),
