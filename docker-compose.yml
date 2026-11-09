@@ -31,6 +31,15 @@ services:
     # just makes `docker-compose build` produce it as part of one command.
     entrypoint: ["true"]
 
+  lab-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.lab
+    image: nakima-lab-runner:latest
+    # Build-only image. The unmounted Lab API may launch this image after
+    # the release gates pass; this service never processes a repository.
+    entrypoint: ["true"]
+
   clamav:
     image: clamav/clamav:stable
     # ClamAV starts freshclam (signature downloader) and clamd (scanner
@@ -71,6 +80,8 @@ services:
       redis:
         condition: service_started
       sandbox:
+        condition: service_completed_successfully
+      lab-runner:
         condition: service_completed_successfully
       clamav:
         condition: service_healthy
