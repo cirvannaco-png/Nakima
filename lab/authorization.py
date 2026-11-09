@@ -22,11 +22,7 @@ def is_lab_operator(principal: LabPrincipal) -> bool:
     """Global operators are explicitly allowlisted by immutable OIDC subject."""
     if principal.issuer != settings.LAB_OIDC_ISSUER:
         return False
-    allowed_subjects = {
-        subject.strip()
-        for subject in settings.LAB_OIDC_ADMIN_SUBJECTS.split(",")
-        if subject.strip()
-    }
+    allowed_subjects = {subject.strip() for subject in settings.LAB_OIDC_ADMIN_SUBJECTS.split(",") if subject.strip()}
     return principal.subject in allowed_subjects
 
 
@@ -76,9 +72,7 @@ async def grant_installation_membership(
         raise HTTPException(status_code=422, detail="A valid OIDC subject is required")
 
     installation = await session.scalar(
-        select(ProviderInstallation)
-        .where(ProviderInstallation.id == provider_installation_id)
-        .with_for_update()
+        select(ProviderInstallation).where(ProviderInstallation.id == provider_installation_id).with_for_update()
     )
     if installation is None or not installation.is_active:
         raise HTTPException(status_code=404, detail="Active provider installation not found")
