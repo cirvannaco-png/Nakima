@@ -240,20 +240,22 @@ def main() -> int:
                 is_security_relevant=heal_result.final_diagnosis.is_security_relevant,
             )
         selected = heal_result.selected_candidate
+        selected_passed = bool(selected and selected.full_suite_passed and selected.diff)
+        healed = bool(heal_result.success and selected_passed)
         result = LabRunResult(
             run_id=run_id,
             commit_sha=commit_sha,
-            status="healed" if heal_result.success else "escalated",
+            status="healed" if healed else "escalated",
             baseline_passed=baseline_passed,
-            full_test_suite_passed=bool(selected and selected.test_passed),
+            full_test_suite_passed=selected_passed,
             attempts_used=heal_result.attempts_used,
             confidence_score=heal_result.confidence_score,
-            requires_mandatory_review=heal_result.requires_mandatory_review or not heal_result.success,
+            requires_mandatory_review=True,
             diagnosis=diagnosis,
-            selected_diff=selected.diff if selected else None,
+            selected_diff=selected.diff if healed else None,
             candidate_count=len(heal_result.all_candidates),
-            error_code=None if heal_result.success else "no_validated_candidate",
-            error=None if heal_result.success else heal_result.escalation_reason,
+            error_code=None if healed else "no_validated_candidate",
+            error=None if healed else (heal_result.escalation_reason or "No candidate passed full-suite validation"),
             duration_seconds=max(0.0, time.time() - started_at),
         )
         write_result(result)
