@@ -8,6 +8,7 @@ from githubapp.installation_sync import (
     sync_github_installation_event,
 )
 from models.provider_installation import ProviderInstallation
+from models.provider_installation_membership import ProviderInstallationMembership
 from models.repository import Repository
 
 
@@ -156,6 +157,17 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert repository is not None
     assert installation is not None
 
+    membership = ProviderInstallationMembership(
+        provider_installation_id=installation.id,
+        principal_issuer="https://identity.example.test/",
+        principal_subject="tenant-owner-1",
+        role="owner",
+        granted_by_issuer="https://identity.example.test/",
+        granted_by_subject="operator-1",
+    )
+    db_session.add(membership)
+    await db_session.commit()
+
     await sync_github_installation_event(
         db_session,
         "installation",
@@ -166,6 +178,9 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert installation.is_active is False
     assert repository.provider_installation_id is None
     assert repository.sandbox_lab_opt_in is False
+    assert membership.is_active is False
+    assert membership.revoked_at is not None
+    assert membership.revoked_by_issuer == "urn:nakima:system"
 
 
 @pytest.mark.asyncio
