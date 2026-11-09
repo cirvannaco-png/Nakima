@@ -38,8 +38,9 @@ class GitHubAppAuth:
         if not self.app_id:
             raise GitHubAppAuthError("GITHUB_APP_ID is not configured. Set it in your .env or environment.")
         self._private_key_pem = self._load_private_key()
-        # installation_id -> {"token": str, "expires_at": float (unix ts)}
-        self._token_cache: dict[int, dict[str, float | str]] = {}
+        # Cache entries are scoped to an installation, one repository, and
+        # the exact permission set. Never reuse a broader token across repos.
+        self._token_cache: dict[tuple[int, int, tuple[tuple[str, str], ...]], dict[str, float | str]] = {}
 
     def _load_private_key(self) -> str:
         if settings.GITHUB_PRIVATE_KEY:
@@ -75,9 +76,27 @@ class GitHubAppAuth:
             ) from e
         return jwt.encode(payload, private_key, algorithm="RS256")
 
-    async def get_installation_token(self, installation_id: int, force_refresh: bool = False) -> str:
-        """Exchanges (or reuses a cached) JWT for an installation access token."""
-        cached = self._token_cache.get(installation_id)
+    async def get_repository_installation_token(
+        self,
+        installation_id: int,
+        repository_id: int,
+        permissions: dict[str, str],
+        force_refresh: bool = False,
+    ) -> str:
+        """Mint/cache an installation token restricted to one repository.
+
+        `permissions` must describe the minimum access needed by the caller.
+        The repository and exact permission set are part of the cache key so a
+        token minted for one repo or workflow cannot silently widen another.
+        """
+        if installation_id <= 0 or repository_id <= 0:
+            raise GitHubAppAuthError("Installation and repository IDs must be positive integers")
+        if not permissions or any(level not in {"read", "write"} for level in permissions.values()):
+            raise GitHubAppAuthError("A non-empty, valid GitHub permission set is required")
+
+        permission_key = tuple(sorted((str(name), str(level)) for name, level in permissions.items()))
+        cache_key = (installation_id, repository_id, permission_key)
+        cached = self._token_cache.get(cache_key)
         if cached and not force_refresh and cached["expires_at"] > time.time() + 30:
             return str(cached["token"])
 
@@ -90,20 +109,25 @@ class GitHubAppAuth:
                     "Accept": "application/vnd.github+json",
                     "X-GitHub-Api-Version": "2022-11-28",
                 },
+                json={
+                    "repository_ids": [repository_id],
+                    "permissions": dict(permission_key),
+                },
             )
             if resp.status_code != 201:
                 raise GitHubAppAuthError(
-                    f"Failed to get installation token for installation {installation_id}: "
-                    f"{resp.status_code} {resp.text}"
+                    f"Failed to get repository-scoped installation token: {resp.status_code} {resp.text}"
                 )
             data = resp.json()
 
-        # GitHub returns "expires_at" as an ISO8601 string; token is valid for 1 hour.
-        self._token_cache[installation_id] = {
-            "token": data["token"],
-            "expires_at": time.time() + 3600 - 60,  # shave a minute off for safety
+        token = data.get("token")
+        if not token:
+            raise GitHubAppAuthError("GitHub returned an installation-token response without a token")
+        self._token_cache[cache_key] = {
+            "token": token,
+            "expires_at": time.time() + 3600 - 60,
         }
-        return data["token"]
+        return token
 
 
 class _LazyGitHubAppAuth:
