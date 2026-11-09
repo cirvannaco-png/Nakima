@@ -5,7 +5,10 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from core.limiter import limiter
 from database.session import AsyncSessionLocal
 from githubapp.auth import GitHubAppAuthError, github_auth
-from githubapp.installation_sync import sync_github_installation_event
+from githubapp.installation_sync import (
+    require_active_github_repository_installation,
+    sync_github_installation_event,
+)
 from githubapp.webhooks import verify_webhook
 from orchestrator.workflow import WorkflowOrchestrator
 
@@ -43,6 +46,25 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
     if not event.repo_full_name:
         return {"status": "ignored", "reason": "no repository in payload"}
+
+    # Do not let a normal issue/push/PR webhook create or transfer tenant
+    # ownership. It must match a previously synchronized, active installation
+    # and canonical GitHub repository ID before any workflow credential is
+    # requested.
+    try:
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                await require_active_github_repository_installation(
+                    session,
+                    event.payload.get("installation"),
+                    event.payload.get("repository"),
+                )
+    except ValueError as exc:
+        logger.warning("Rejected repository webhook because tenant ownership could not be verified: %s", exc)
+        raise HTTPException(
+            status_code=403,
+            detail="Repository is not registered to an active GitHub App installation",
+        ) from exc
 
     try:
         token = await github_auth.get_installation_token(event.installation_id)
