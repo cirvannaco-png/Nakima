@@ -26,7 +26,6 @@ def principals(monkeypatch):
         "reviewer": LabPrincipal(issuer=issuer, subject="reviewer-3"),
     }
 
-
 @pytest.mark.asyncio
 async def test_membership_roles_are_scoped_to_exact_installation(db_session, principals):
     first = ProviderInstallation(provider="github", external_installation_id="tenant-first")
@@ -51,7 +50,6 @@ async def test_membership_roles_are_scoped_to_exact_installation(db_session, pri
     with pytest.raises(HTTPException) as denied:
         await require_installation_role(db_session, second.id, principals["maintainer"], RUN_ROLES)
     assert denied.value.status_code == 403
-
 
 @pytest.mark.asyncio
 async def test_reviewer_cannot_create_runs_and_maintainer_cannot_review(db_session, principals):
@@ -90,11 +88,8 @@ async def test_reviewer_cannot_create_runs_and_maintainer_cannot_review(db_sessi
         await require_installation_role(db_session, installation.id, principals["maintainer"], REVIEW_ROLES)
     assert maintainer_denied.value.status_code == 403
 
-
 @pytest.mark.asyncio
-async def test_global_operator_can_grant_and_revoke_membership_with_audit(
-    db_session, principals
-):
+async def test_global_operator_can_grant_and_revoke_membership_with_audit(db_session, principals):
     installation = ProviderInstallation(provider="github", external_installation_id="membership-audit")
     db_session.add(installation)
     await db_session.flush()
@@ -127,7 +122,6 @@ async def test_global_operator_can_grant_and_revoke_membership_with_audit(
     with pytest.raises(HTTPException):
         await require_installation_role(db_session, installation.id, principals["maintainer"], READ_ROLES)
 
-
 @pytest.mark.asyncio
 async def test_non_operator_cannot_grant_installation_membership(db_session, principals):
     installation = ProviderInstallation(provider="github", external_installation_id="operator-only")
@@ -143,7 +137,6 @@ async def test_non_operator_cannot_grant_installation_membership(db_session, pri
             principals["maintainer"],
         )
     assert denied.value.status_code == 403
-
 
 @pytest.mark.asyncio
 async def test_inactive_installation_denies_even_active_membership(db_session, principals):
@@ -170,12 +163,8 @@ async def test_inactive_installation_denies_even_active_membership(db_session, p
         await require_installation_role(db_session, installation.id, principals["maintainer"], READ_ROLES)
     assert denied.value.status_code == 403
 
-
-
 @pytest.mark.asyncio
-async def test_role_change_creates_a_new_grant_and_preserves_revocation_history(
-    db_session, principals
-):
+async def test_role_change_creates_a_new_grant_and_preserves_revocation_history(db_session, principals):
     installation = ProviderInstallation(provider="github", external_installation_id="membership-role-history")
     db_session.add(installation)
     await db_session.flush()
@@ -207,18 +196,20 @@ async def test_role_change_creates_a_new_grant_and_preserves_revocation_history(
     assert original.revoked_at is not None
 
     history = (
-        await db_session.execute(
-            select(ProviderInstallationMembership)
-            .where(
-                ProviderInstallationMembership.provider_installation_id == installation.id,
-                ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+        (
+            await db_session.execute(
+                select(ProviderInstallationMembership)
+                .where(
+                    ProviderInstallationMembership.provider_installation_id == installation.id,
+                    ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+                )
+                .order_by(ProviderInstallationMembership.id)
             )
-            .order_by(ProviderInstallationMembership.id)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(history) == 2
-
-
 
 @pytest.mark.asyncio
 async def test_regrant_same_role_is_idempotent(db_session, principals):
@@ -245,12 +236,16 @@ async def test_regrant_same_role_is_idempotent(db_session, principals):
     await db_session.commit()
 
     records = (
-        await db_session.execute(
-            select(ProviderInstallationMembership).where(
-                ProviderInstallationMembership.provider_installation_id == installation.id,
-                ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+        (
+            await db_session.execute(
+                select(ProviderInstallationMembership).where(
+                    ProviderInstallationMembership.provider_installation_id == installation.id,
+                    ProviderInstallationMembership.principal_subject == principals["maintainer"].subject,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert first.id == second.id
     assert len(records) == 1
