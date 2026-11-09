@@ -147,6 +147,7 @@ def test_extract_rejects_archive_digest_mismatch(tmp_path):
         extract_verified_source_bundle(archive, tmp_path / "workspace")
     assert not (tmp_path / "workspace").exists()
 
+
 def test_extract_rejects_path_traversal_without_creating_workspace(tmp_path):
     archive = _bundle_from_bytes(
         tmp_path,
@@ -180,7 +181,6 @@ def test_extract_rejects_multiple_archive_roots(tmp_path):
 
     with pytest.raises(SourceBundleError, match="exactly one root"):
         extract_verified_source_bundle(bundle, tmp_path / "workspace")
-
 
 
 @pytest.mark.asyncio
