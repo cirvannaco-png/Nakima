@@ -24,6 +24,7 @@ from lab.authorization import (
     REVIEW_ROLES,
     RUN_ROLES,
     grant_installation_membership,
+    is_lab_operator,
     require_installation_role,
     revoke_installation_membership,
 )
@@ -128,6 +129,28 @@ async def _get_active_repository(
             detail="Repository is not linked to an active provider installation",
         )
     return row
+
+
+@app.get(
+    "/lab/admin/installations/{provider_installation_id}/memberships",
+    response_model=list[MembershipResponse],
+)
+async def list_installation_memberships(
+    provider_installation_id: int,
+    principal: LabPrincipal = Depends(get_current_lab_principal),
+    session: AsyncSession = Depends(get_db),
+):
+    if not is_lab_operator(principal):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Global Lab operator permission required")
+    installation = await session.get(ProviderInstallation, provider_installation_id)
+    if installation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider installation not found")
+    result = await session.execute(
+        select(ProviderInstallationMembership)
+        .where(ProviderInstallationMembership.provider_installation_id == provider_installation_id)
+        .order_by(ProviderInstallationMembership.principal_subject)
+    )
+    return [_membership_response(membership) for membership in result.scalars()]
 
 
 @app.post("/lab/admin/installations/{provider_installation_id}/memberships", response_model=MembershipResponse)
