@@ -75,41 +75,52 @@ async def grant_installation_membership(
     if not isinstance(principal_subject, str) or not principal_subject.strip() or len(principal_subject) > 255:
         raise HTTPException(status_code=422, detail="A valid OIDC subject is required")
 
-    installation = await session.get(ProviderInstallation, provider_installation_id)
+    installation = await session.scalar(
+        select(ProviderInstallation)
+        .where(ProviderInstallation.id == provider_installation_id)
+        .with_for_update()
+    )
     if installation is None or not installation.is_active:
         raise HTTPException(status_code=404, detail="Active provider installation not found")
 
     result = await session.execute(
-        select(ProviderInstallationMembership).where(
+        select(ProviderInstallationMembership)
+        .where(
             ProviderInstallationMembership.provider_installation_id == provider_installation_id,
             ProviderInstallationMembership.principal_issuer == granted_by.issuer,
             ProviderInstallationMembership.principal_subject == principal_subject.strip(),
+            ProviderInstallationMembership.is_active.is_(True),
         )
+        .with_for_update()
     )
-    membership = result.scalar_one_or_none()
+    active_membership = result.scalar_one_or_none()
     now = datetime.now(UTC)
-    if membership is None:
-        membership = ProviderInstallationMembership(
-            provider_installation_id=provider_installation_id,
-            principal_issuer=granted_by.issuer,
-            principal_subject=principal_subject.strip(),
-            role=role,
-            is_active=True,
-            granted_by_issuer=granted_by.issuer,
-            granted_by_subject=granted_by.subject,
-            granted_at=now,
-        )
-        session.add(membership)
-    else:
-        membership.role = role
-        membership.is_active = True
-        membership.granted_by_issuer = granted_by.issuer
-        membership.granted_by_subject = granted_by.subject
-        membership.granted_at = now
-        membership.revoked_by_issuer = None
-        membership.revoked_by_subject = None
-        membership.revoked_at = None
-        membership.updated_at = now
+
+    if active_membership is not None and active_membership.role == role:
+        return active_membership
+
+    if active_membership is not None:
+        # A role change closes the previous grant and creates a new immutable
+        # grant record. Historical issuer/subject, grantor and revoke evidence
+        # remain queryable instead of being overwritten.
+        active_membership.is_active = False
+        active_membership.revoked_by_issuer = granted_by.issuer
+        active_membership.revoked_by_subject = granted_by.subject
+        active_membership.revocation_reason = "role_changed"
+        active_membership.revoked_at = now
+        active_membership.updated_at = now
+
+    membership = ProviderInstallationMembership(
+        provider_installation_id=provider_installation_id,
+        principal_issuer=granted_by.issuer,
+        principal_subject=principal_subject.strip(),
+        role=role,
+        is_active=True,
+        granted_by_issuer=granted_by.issuer,
+        granted_by_subject=granted_by.subject,
+        granted_at=now,
+    )
+    session.add(membership)
     await session.flush()
     return membership
 
@@ -124,10 +135,12 @@ async def revoke_installation_membership(
         raise HTTPException(status_code=403, detail="Global Lab operator permission required")
 
     membership = await session.scalar(
-        select(ProviderInstallationMembership).where(
+        select(ProviderInstallationMembership)
+        .where(
             ProviderInstallationMembership.id == membership_id,
             ProviderInstallationMembership.provider_installation_id == provider_installation_id,
         )
+        .with_for_update()
     )
     if membership is None:
         raise HTTPException(status_code=404, detail="Installation membership not found")
@@ -135,6 +148,7 @@ async def revoke_installation_membership(
         membership.is_active = False
         membership.revoked_by_issuer = revoked_by.issuer
         membership.revoked_by_subject = revoked_by.subject
+        membership.revocation_reason = "operator_revoked"
         membership.revoked_at = datetime.now(UTC)
         membership.updated_at = membership.revoked_at
     await session.flush()
