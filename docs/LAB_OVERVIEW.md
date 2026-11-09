@@ -54,7 +54,9 @@ and non-executable. Do not apply it.
 - `orchestrator/main.py` still accepts UUID repository/organization IDs,
   uses an in-memory run registry, and contains unimplemented consent,
   clone-resolution, result-polling, and persistence functions. Its request
-  contract does not yet use the canonical integer repository key.
+  contract does not yet use the canonical integer repository key. The main
+  GitHub webhook workflow now upserts signed installation/repository metadata,
+  but Lab requests still do not use that mapping.
 - The sandbox container is launched with `network_mode="none"`, while the
   current entrypoint attempts to clone from GitHub inside the container.
   Those requirements contradict each other. Host-side clone and immutable

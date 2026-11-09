@@ -4,6 +4,7 @@ import uuid
 
 from github import Github  # PyGithub — safe now that our local package is githubapp, not github
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from agents.base import AgentRequest
 from agents.debug import DebugAgent
@@ -13,6 +14,7 @@ from intelligence.decision_registry import DecisionRegistry
 from intelligence.event_log import EventLog
 from memory.knowledge_graph import KnowledgeGraphBuilder
 from memory.learning import OutcomeAnalyzer
+from models.provider_installation import ProviderInstallation
 from models.repository import Repository
 from models.task import Task, TaskStatus
 from neis.reasoning.arbitration_engine import DriftVerdict
@@ -28,6 +30,19 @@ from security.policy_checker import PolicyChecker
 from validation.pipeline import ValidationPipeline
 
 logger = logging.getLogger(__name__)
+
+
+class RepositoryProviderMetadataError(ValueError):
+    """Raised when a signed provider webhook lacks stable repository identity."""
+
+
+class RepositoryTenantConflictError(RuntimeError):
+    """Raised when provider metadata attempts to move a repository across tenants."""
+
+
+class RepositoryIdentityConflictError(RuntimeError):
+    """Raised when one provider repository ID maps to conflicting local rows."""
+
 
 MAX_VALIDATION_RETRIES = 3
 
@@ -107,7 +122,7 @@ def build_verification_summary(drift_result, nsil_result, quality_result) -> str
 
 class WorkflowOrchestrator:
     async def handle_webhook_event(self, event_type: str, payload: dict, repo_full_name: str, github_token: str):
-        repo = await self._ensure_repository(repo_full_name)
+        repo = await self._ensure_repository(repo_full_name, provider_payload=payload)
 
         if event_type == "issues" and payload.get("action") == "opened":
             async with AsyncSessionLocal() as session:
@@ -125,16 +140,154 @@ class WorkflowOrchestrator:
         else:
             logger.info(f"No handler for {event_type}/{payload.get('action')}; ignoring")
 
-    async def _ensure_repository(self, repo_full_name: str) -> Repository:
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(Repository).where(Repository.full_name == repo_full_name))
-            repo = result.scalar_one_or_none()
-            if not repo:
-                repo = Repository(full_name=repo_full_name)
-                session.add(repo)
-                await session.commit()
-                await session.refresh(repo)
-            return repo
+    async def _ensure_repository(
+        self,
+        repo_full_name: str,
+        provider_payload: dict | None = None,
+    ) -> Repository:
+        """Resolve a repository and, for webhooks, persist verified provider ownership.
+
+        Webhook payloads reach this method only after HMAC verification. The
+        provider installation ID and repository ID are persisted as external
+        identifiers; Nakima's own integer IDs remain the only internal keys.
+        """
+        if provider_payload is None:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Repository).where(Repository.full_name == repo_full_name))
+                repo = result.scalar_one_or_none()
+                if not repo:
+                    repo = Repository(full_name=repo_full_name)
+                    session.add(repo)
+                    await session.commit()
+                    await session.refresh(repo)
+                return repo
+
+        installation_data = provider_payload.get("installation") or {}
+        repository_data = provider_payload.get("repository") or {}
+        account_data = installation_data.get("account") or {}
+
+        try:
+            external_installation_id = int(installation_data.get("id"))
+            external_repository_id = int(repository_data.get("id"))
+        except (TypeError, ValueError) as exc:
+            raise RepositoryProviderMetadataError(
+                "Verified GitHub webhook is missing a numeric installation or repository ID"
+            ) from exc
+
+        if external_installation_id <= 0 or external_repository_id <= 0:
+            raise RepositoryProviderMetadataError("Provider installation and repository IDs must be positive")
+
+        payload_full_name = repository_data.get("full_name") or repo_full_name
+        if not payload_full_name or payload_full_name.casefold() != repo_full_name.casefold():
+            raise RepositoryProviderMetadataError("Webhook repository name does not match the routed repository")
+
+        account_external_id = account_data.get("id")
+        account_external_id = str(account_external_id) if account_external_id is not None else None
+        account_login = account_data.get("login")
+        account_type = account_data.get("type")
+
+        # A concurrent first webhook may create the installation/repository
+        # between our SELECT and INSERT. Retry once after a uniqueness race,
+        # then re-resolve and verify ownership rather than accepting a conflict.
+        for attempt in range(2):
+            try:
+                async with AsyncSessionLocal() as session:
+                    installation_result = await session.execute(
+                        select(ProviderInstallation).where(
+                            ProviderInstallation.provider == "github",
+                            ProviderInstallation.external_installation_id == str(external_installation_id),
+                        )
+                    )
+                    installation = installation_result.scalar_one_or_none()
+
+                    if installation is None:
+                        installation = ProviderInstallation(
+                            provider="github",
+                            external_installation_id=str(external_installation_id),
+                            account_external_id=account_external_id,
+                            account_login=account_login,
+                            account_type=account_type,
+                        )
+                        session.add(installation)
+                        await session.flush()
+                    else:
+                        if (
+                            account_external_id
+                            and installation.account_external_id
+                            and installation.account_external_id != account_external_id
+                        ):
+                            raise RepositoryTenantConflictError(
+                                "GitHub installation account identity changed; explicit reconnection is required"
+                            )
+                        if account_external_id and not installation.account_external_id:
+                            installation.account_external_id = account_external_id
+                        if account_login:
+                            installation.account_login = account_login
+                        if account_type:
+                            installation.account_type = account_type
+
+                    by_provider_id = await session.execute(
+                        select(Repository).where(Repository.github_repo_id == external_repository_id)
+                    )
+                    matching_repositories = by_provider_id.scalars().all()
+                    if len(matching_repositories) > 1:
+                        raise RepositoryIdentityConflictError(
+                            "Multiple local repositories already claim this GitHub repository ID"
+                        )
+                    repo = matching_repositories[0] if matching_repositories else None
+
+                    if repo is None:
+                        by_name = await session.execute(
+                            select(Repository).where(Repository.full_name == payload_full_name)
+                        )
+                        repo = by_name.scalar_one_or_none()
+
+                    if repo is None:
+                        repo = Repository(
+                            full_name=payload_full_name,
+                            github_repo_id=external_repository_id,
+                            provider_installation_id=installation.id,
+                        )
+                        session.add(repo)
+                    else:
+                        if repo.github_repo_id is not None and repo.github_repo_id != external_repository_id:
+                            raise RepositoryIdentityConflictError(
+                                "Repository name is already bound to a different GitHub repository ID"
+                            )
+                        if (
+                            repo.provider_installation_id is not None
+                            and repo.provider_installation_id != installation.id
+                        ):
+                            raise RepositoryTenantConflictError(
+                                "Repository is already bound to another provider installation"
+                            )
+
+                        if repo.full_name != payload_full_name:
+                            collision = await session.execute(
+                                select(Repository.id).where(
+                                    Repository.full_name == payload_full_name,
+                                    Repository.id != repo.id,
+                                )
+                            )
+                            if collision.scalar_one_or_none() is not None:
+                                raise RepositoryIdentityConflictError(
+                                    "Repository rename conflicts with another local repository"
+                                )
+                            repo.full_name = payload_full_name
+
+                        repo.github_repo_id = external_repository_id
+                        repo.provider_installation_id = installation.id
+
+                    await session.commit()
+                    await session.refresh(repo)
+                    return repo
+            except IntegrityError as exc:
+                if attempt == 1:
+                    raise RepositoryIdentityConflictError(
+                        "Concurrent provider metadata update conflicted with an existing repository record"
+                    ) from exc
+
+        raise RepositoryIdentityConflictError("Could not resolve provider repository identity")
 
     async def _handle_new_issue(self, payload: dict, repo_full_name: str, github_token: str):
         issue = payload["issue"]

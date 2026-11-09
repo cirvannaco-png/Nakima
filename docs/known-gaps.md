@@ -12,9 +12,10 @@ real vs. stubbed right now.
 - Migration `0014` defines `sandbox_runs`, `run_reviews`, and
   `model_candidate_fixes`. Every run carries the canonical repository ID and
   provider-installation ID under a composite FK; PostgreSQL enforces synthetic
-  injection consent with a trigger. The tables are not yet wired into the
-  orchestrator, and verified webhook metadata is not yet upserted into
-  provider-installation rows.
+  injection consent with a trigger. The signed GitHub webhook workflow now
+  upserts provider-installation/repository identity and rejects tenant or
+  external-ID conflicts. Lab lifecycle persistence is still not wired, and
+  GitLab/other provider webhook adapters remain future work.
 - `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
 
 ## Stubbed, needs implementation before first live test

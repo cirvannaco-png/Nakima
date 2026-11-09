@@ -29,6 +29,7 @@ class Repository(Base):
         ),
         Index("ix_repositories_provider_installation_id", "provider_installation_id"),
         UniqueConstraint("id", "provider_installation_id", name="uq_repositories_id_installation"),
+        UniqueConstraint("github_repo_id", name="uq_repositories_github_repo_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
