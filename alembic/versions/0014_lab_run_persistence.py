@@ -70,7 +70,7 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE FUNCTION enforce_sandbox_run_consent()
-        RETURNS trigger AS $
+        RETURNS trigger AS $enforce$
         BEGIN
             IF NEW.synthetic_injection_used AND NOT EXISTS (
                 SELECT 1
@@ -85,7 +85,7 @@ def upgrade() -> None:
             END IF;
             RETURN NEW;
         END;
-        $ LANGUAGE plpgsql;
+        $enforce$ LANGUAGE plpgsql;
         """
     )
     op.execute(
