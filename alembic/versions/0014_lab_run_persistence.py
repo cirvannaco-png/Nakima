@@ -30,8 +30,9 @@ def upgrade() -> None:
         sa.Column("source_commit_sha", sa.String(length=64), nullable=False),
         sa.Column("container_id", sa.String(length=128), nullable=True),
         sa.Column("container_image", sa.String(length=255), nullable=True),
-        sa.Column("network_isolated", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("network_isolated", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("synthetic_injection_used", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("result_schema_version", sa.String(length=32), nullable=True),
         sa.Column("diagnosis", sa.JSON(), nullable=True),
         sa.Column("proposed_fix_diff", sa.Text(), nullable=True),
         sa.Column("ai_models_consulted", sa.JSON(), nullable=True),
@@ -104,13 +105,20 @@ def upgrade() -> None:
         sa.Column("candidate_status", sa.String(length=16), nullable=False, server_default="proposed"),
         sa.Column("test_suite_passed", sa.Boolean(), nullable=True),
         sa.Column("test_results", sa.JSON(), nullable=True),
-        sa.Column("selected", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("judge_reasoning", sa.Text(), nullable=True),
         sa.Column("retained_for_training", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.CheckConstraint(
             "candidate_status IN ('proposed', 'applied', 'tested', 'rejected', 'selected')",
             name="ck_model_candidate_fixes_status",
+        ),
+        sa.CheckConstraint(
+            "candidate_status NOT IN ('tested', 'selected') OR test_suite_passed IS NOT NULL",
+            name="ck_model_candidate_fixes_tested_has_result",
+        ),
+        sa.CheckConstraint(
+            "candidate_status != 'selected' OR test_suite_passed = true",
+            name="ck_model_candidate_fixes_selected_passed",
         ),
     )
     op.create_index("ix_model_candidate_fixes_run", "model_candidate_fixes", ["sandbox_run_id"])
