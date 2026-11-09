@@ -13,7 +13,6 @@ from lab.source_bundle import (
     fetch_pinned_github_bundle,
 )
 
-
 COMMIT_SHA = "a" * 40
 
 
