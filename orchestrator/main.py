@@ -223,7 +223,10 @@ async def review_sandbox_run(
     principal: LabPrincipal = Depends(get_current_lab_principal),
     session: AsyncSession = Depends(get_db),
 ):
-    run = await session.get(SandboxRun, run_id)
+    result = await session.execute(
+        select(SandboxRun).where(SandboxRun.id == run_id).with_for_update()
+    )
+    run = result.scalar_one_or_none()
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     await require_installation_role(session, run.provider_installation_id, principal, REVIEW_ROLES)
