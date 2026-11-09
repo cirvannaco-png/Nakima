@@ -219,6 +219,7 @@ async def sync_github_installation_event(
                     membership.is_active = False
                     membership.revoked_by_issuer = "urn:nakima:system"
                     membership.revoked_by_subject = "github-installation-deleted"
+                    membership.revocation_reason = "installation_deleted"
                     membership.revoked_at = revoked_at
                     membership.updated_at = revoked_at
 
