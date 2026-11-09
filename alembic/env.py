@@ -23,6 +23,7 @@ from models.neis.technology_intel import TechnologyIntel  # noqa: F401
 from models.neis.user_intent import UserIntent  # noqa: F401
 from models.policy import RepositoryPolicy  # noqa: F401
 from models.provider_installation import ProviderInstallation  # noqa: F401
+from models.provider_installation_membership import ProviderInstallationMembership  # noqa: F401
 from models.report import EngineeringReport  # noqa: F401
 
 # Import all models so Base.metadata is fully populated for autogenerate.
