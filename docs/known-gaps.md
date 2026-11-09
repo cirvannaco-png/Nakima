@@ -9,12 +9,10 @@ real vs. stubbed right now.
 
 - Migration `0013` adds a provider-neutral `provider_installations` table and links the existing integer-keyed `repositories` rows to an internal installation ID. External provider IDs are stored as strings and uniquely scoped by provider.
 - Legacy repositories remain unattached and Lab-opted-out. A database CHECK constraint requires an installation, consent timestamp, actor identifier, and consent version before opt-in.
-- Migration `0014` defines `sandbox_runs`, `run_reviews`, and
-  `model_candidate_fixes`. Every run carries the canonical repository ID and
-  provider-installation ID under a composite FK; PostgreSQL enforces synthetic
-  injection consent with a trigger. The tables are not yet wired into the
-  orchestrator, and verified webhook metadata is not yet upserted into
-  provider-installation rows.
+- Durable `sandbox_runs`, `run_reviews`, and `model_candidate_fixes`
+  tables are the next persistence slice. They are not part of migration
+  `0013` and are not yet in the canonical migration chain. Do not assume that
+  result, candidate, or review persistence is available on this branch.
 - `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
 
 ## API exposure and authorization blocker
@@ -43,8 +41,8 @@ real vs. stubbed right now.
   Never pass the workflow token or an org-wide PAT to the sandbox.
 - `orchestrator/main.py::_await_container_completion` — needs real container
   log polling + a defined structured JSON contract the sandbox entrypoint
-  writes before exit. The database now has a `result_schema_version` field,
-  but the Pydantic result contract and persistence path are still missing.
+  writes before exit. The Pydantic result contract and persistence path are
+  still missing.
 - `orchestrator/self_healing.py::diagnose_failure` and
   `generate_candidate_fix` — need real model API wiring. Structured output
   schemas need to be nailed down and tested against real CI logs from Nakima
