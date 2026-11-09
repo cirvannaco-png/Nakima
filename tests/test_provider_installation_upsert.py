@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from database.base import Base
@@ -133,5 +134,42 @@ async def test_webhook_repository_upsert_fails_closed_without_stable_ids(monkeyp
                 "example/repo",
                 provider_payload={"installation": {"id": 501}, "repository": {"full_name": "example/repo"}},
             )
+    finally:
+        await engine.dispose()
+
+
+
+@pytest.mark.asyncio
+async def test_installation_account_identity_cannot_be_silently_changed(monkeypatch):
+    engine, _ = await _wire_test_database(monkeypatch)
+    try:
+        orchestrator = WorkflowOrchestrator()
+        await orchestrator._ensure_repository("example/repo", provider_payload=_payload())
+
+        with pytest.raises(RepositoryTenantConflictError):
+            await orchestrator._ensure_repository(
+                "example/repo",
+                provider_payload=_payload(account_id=88),
+            )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_database_rejects_duplicate_non_null_github_repository_ids(monkeypatch):
+    engine, session_factory = await _wire_test_database(monkeypatch)
+    try:
+        orchestrator = WorkflowOrchestrator()
+        repository = await orchestrator._ensure_repository("example/repo", provider_payload=_payload())
+
+        async with session_factory() as session:
+            duplicate = Repository(
+                full_name="example/duplicate",
+                github_repo_id=repository.github_repo_id,
+                provider_installation_id=repository.provider_installation_id,
+            )
+            session.add(duplicate)
+            with pytest.raises(IntegrityError):
+                await session.commit()
     finally:
         await engine.dispose()
