@@ -49,10 +49,17 @@ real vs. stubbed right now.
 
 ## Remaining P0 engineering work
 
-- Host-side, pinned repository clone and verified immutable archive transfer.
-  Never pass repository credentials or a clone URL into the network-isolated
-  container. Integrate a truly repository-scoped read-only credential; PR #95
-  separately addresses the ordinary GitHub workflow token permissions.
+- The trusted-host source-bundle building block now verifies the exact commit
+  through the GitHub API, fetches a tarball using a repository-scoped
+  `contents:read` token, never forwards that token to codeload, computes a
+  SHA-256 digest, and rejects path traversal, links, special files, duplicate
+  paths and archive-size bombs. It deliberately rejects repositories that
+  contain symlinks until a separately tested safe-link policy exists.
+- Still required: wire the helper to an authenticated host-side orchestration
+  lifecycle, obtain the narrowly scoped token (PR #95), pass only the archive
+  and expected digest as read-only input to the container, and make the
+  runner verify/extract that archive. Never pass a clone URL or credential to
+  the network-isolated container.
 - One authoritative sandbox image, tag and entrypoint. The current image
   requested by the Lab scaffold does not match the image built by CI.
 - Typed result schema and versioned container output; bounded polling,
