@@ -6,7 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    ForeignKey,
+    ForeignKeyConstraint,
     Index,
     func,
     String,
@@ -38,12 +38,19 @@ class SandboxRun(Base):
             "synthetic_injection_used = false OR trigger = 'synthetic_injection'",
             name="ck_sandbox_runs_synthetic_trigger",
         ),
+        ForeignKeyConstraint(
+            ["repository_id", "provider_installation_id"],
+            ["repositories.id", "repositories.provider_installation_id"],
+            ondelete="CASCADE",
+            name="fk_sandbox_runs_repository_tenant",
+        ),
         Index("ix_sandbox_runs_repository_created", "repository_id", "created_at"),
         Index("ix_sandbox_runs_status_expires", "status", "expires_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    repository_id: Mapped[int] = mapped_column(nullable=False)
+    provider_installation_id: Mapped[int] = mapped_column(nullable=False)
     trigger: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", server_default="queued")
     source_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -71,7 +78,7 @@ class SandboxRun(Base):
         server_default=func.now(),
     )
 
-    repository = relationship("Repository")
+    repository = relationship("Repository", foreign_keys=[repository_id, provider_installation_id])
     reviews = relationship("RunReview", back_populates="sandbox_run", cascade="all, delete-orphan")
     candidates = relationship("ModelCandidateFix", back_populates="sandbox_run", cascade="all, delete-orphan")
 
