@@ -109,9 +109,7 @@ async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db
             "repositories": [_repository()],
         },
     )
-    repository = await db_session.scalar(
-        select(Repository).where(Repository.github_repo_id == 88001)
-    )
+    repository = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88001))
     installation = await db_session.scalar(
         select(ProviderInstallation).where(ProviderInstallation.external_installation_id == "7001")
     )
