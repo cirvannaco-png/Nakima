@@ -67,13 +67,7 @@ class OIDCVerifier:
             raise LabOIDCNotConfigured("The configured OIDC issuer must use HTTPS")
         if parsed.scheme != "https" and not local_http_allowed:
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint must use HTTPS")
-        if (
-            parsed.username
-            or parsed.password
-            or not parsed.hostname
-            or parsed.query
-            or parsed.fragment
-        ):
+        if parsed.username or parsed.password or not parsed.hostname or parsed.query or parsed.fragment:
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint is invalid")
         if (
             issuer_parsed.username
