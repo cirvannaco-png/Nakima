@@ -146,13 +146,9 @@ async def test_installation_deletion_detaches_repositories(db_session):
             "repositories": [_repository()],
         },
     )
-    repository = await db_session.scalar(
-        select(Repository).where(Repository.github_repo_id == 88001)
-    )
+    repository = await db_session.scalar(select(Repository).where(Repository.github_repo_id == 88001))
     installation = await db_session.scalar(
-        select(ProviderInstallation).where(
-            ProviderInstallation.external_installation_id == "7001"
-        )
+        select(ProviderInstallation).where(ProviderInstallation.external_installation_id == "7001")
     )
     assert repository is not None
     assert installation is not None
@@ -196,9 +192,7 @@ async def test_orphaned_removal_does_not_create_an_installation(db_session):
         },
     )
 
-    installations = (
-        await db_session.execute(select(ProviderInstallation))
-    ).scalars().all()
+    installations = (await db_session.execute(select(ProviderInstallation))).scalars().all()
 
     assert result["status"] == "ignored"
     assert installations == []
