@@ -25,7 +25,6 @@ def _installation(installation_id="7001"):
 def _repository(repo_id=88001, full_name="example-org/service"):
     return {"id": repo_id, "full_name": full_name}
 
-
 @pytest.mark.asyncio
 async def test_installation_repositories_added_is_idempotent_and_uses_canonical_repository_id(db_session):
     payload = {
@@ -61,7 +60,6 @@ async def test_installation_repositories_added_is_idempotent_and_uses_canonical_
     assert repository_rows[0].full_name == "example-org/service"
     assert repository_rows[0].provider_installation_id == installations[0].id
     assert installations[0].is_active is True
-
 
 @pytest.mark.asyncio
 async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_session):
@@ -100,7 +98,6 @@ async def test_repository_removal_detaches_tenant_and_revokes_lab_consent(db_ses
     assert repository.sandbox_lab_consent_actor_id is None
     assert repository.sandbox_lab_consent_version is None
 
-
 @pytest.mark.asyncio
 async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db_session):
     await sync_github_installation_event(
@@ -137,7 +134,6 @@ async def test_installation_suspension_deactivates_tenant_and_revokes_consent(db
     assert repository.provider_installation_id == installation.id
     assert repository.sandbox_lab_opt_in is False
 
-
 @pytest.mark.asyncio
 async def test_installation_deletion_detaches_repositories(db_session):
     await sync_github_installation_event(
@@ -167,7 +163,6 @@ async def test_installation_deletion_detaches_repositories(db_session):
     assert repository.provider_installation_id is None
     assert repository.sandbox_lab_opt_in is False
 
-
 @pytest.mark.asyncio
 async def test_malformed_added_repository_fails_closed(db_session):
     with pytest.raises(ValueError, match="numeric id"):
@@ -181,7 +176,6 @@ async def test_malformed_added_repository_fails_closed(db_session):
             },
         )
     await db_session.rollback()
-
 
 @pytest.mark.asyncio
 async def test_orphaned_removal_does_not_create_an_installation(db_session):
@@ -200,7 +194,6 @@ async def test_orphaned_removal_does_not_create_an_installation(db_session):
     assert result["status"] == "ignored"
     assert installations == []
 
-
 @pytest.mark.asyncio
 async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
     result = await sync_github_installation_event(
@@ -213,8 +206,6 @@ async def test_unknown_installation_action_does_not_create_a_tenant(db_session):
 
     assert result["status"] == "ignored"
     assert installations == []
-
-
 
 @pytest.mark.asyncio
 async def test_normal_repository_webhook_requires_existing_active_installation_link(db_session):
@@ -253,7 +244,6 @@ async def test_normal_repository_webhook_requires_existing_active_installation_l
             _installation(),
             _repository(),
         )
-
 
 @pytest.mark.asyncio
 async def test_repository_webhook_can_update_name_only_for_same_linked_repo(db_session):
