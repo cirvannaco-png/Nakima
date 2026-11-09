@@ -17,6 +17,21 @@ real vs. stubbed right now.
   provider-installation rows.
 - `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
 
+## API exposure and authorization blocker
+
+- The Lab FastAPI app in `orchestrator/main.py` is not mounted by the main
+  `api.router:app` and is not run by the current Compose services. The
+  production Dockerfile starts only `api.router:app`; the Compose
+  `sandbox` service only builds the runner image.
+- Keep the Lab app unexposed. It has no authenticated principal/tenant
+  membership dependency, takes UUID repository/organization identifiers
+  from the request, and accepts `reviewer_user_id` from the caller. A client
+  must never choose the reviewer identity or authorize its own tenant access.
+- Before mounting/deploying Lab endpoints, implement authentication,
+  installation-scoped membership/role checks, server-derived reviewer
+  identity, and authorization on run, read, review, and eventual PR-creation
+  operations.
+
 ## Stubbed, needs implementation before first live test
 
 - `orchestrator/main.py::_repo_has_lab_consent` — still a placeholder; must
