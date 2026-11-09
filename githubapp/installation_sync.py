@@ -97,15 +97,11 @@ async def _upsert_repository(
         raise ValueError("Repository payload is missing a valid full_name")
     full_name = full_name.strip()
 
-    result = await session.execute(
-        select(Repository).where(Repository.github_repo_id == github_repo_id)
-    )
+    result = await session.execute(select(Repository).where(Repository.github_repo_id == github_repo_id))
     repository = result.scalar_one_or_none()
 
     if repository is None:
-        result = await session.execute(
-            select(Repository).where(Repository.full_name == full_name)
-        )
+        result = await session.execute(select(Repository).where(Repository.full_name == full_name))
         repository = result.scalar_one_or_none()
 
     if repository is not None and repository.github_repo_id not in (None, github_repo_id):
