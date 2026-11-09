@@ -52,7 +52,7 @@ def _archive_sha256(path: Path) -> str:
 
 def _read_result_archive(container: Any, max_bytes: int) -> bytes:
     try:
-        stream, stat = container.get_archive("/workspace/result.json")
+        stream, stat = container.get_archive("/output/result.json")
     except (DockerException, NotFound) as exc:
         raise LabRunnerError("Lab container did not produce the required result file") from exc
 
@@ -146,7 +146,7 @@ class LabSandboxRunner:
             raise LabRunnerError("Pinned source archive does not exist")
         if bundle.archive_size_bytes <= 0 or bundle.archive_size_bytes > 100 * 1024 * 1024:
             raise LabRunnerError("Pinned source archive has an invalid size")
-        if bundle.commit_sha != bundle.commit_sha.lower() or len(bundle.commit_sha) not in {40, 64}:
+        if len(bundle.commit_sha) not in {40, 64} or any(c not in "0123456789abcdef" for c in bundle.commit_sha):
             raise LabRunnerError("Pinned source bundle commit SHA is invalid")
         if len(bundle.archive_sha256) != 64 or any(c not in "0123456789abcdef" for c in bundle.archive_sha256):
             raise LabRunnerError("Pinned source bundle digest is invalid")
@@ -172,7 +172,10 @@ class LabSandboxRunner:
                 detach=True,
                 auto_remove=False,
                 init=True,
-                user="10001:10001",
+                # Root is only the controller: it can chown the extracted
+                # workspace and write /output. Repository test processes are
+                # explicitly demoted to UID/GID 10001 by TestSuiteRunner.
+                user="0:0",
                 working_dir="/workspace",
                 environment=environment,
                 volumes={
@@ -184,16 +187,15 @@ class LabSandboxRunner:
                 network_mode="none",
                 read_only=True,
                 cap_drop=["ALL"],
+                cap_add=["CHOWN", "SETUID", "SETGID"],
                 security_opt=["no-new-privileges:true"],
                 pids_limit=self.pids_limit,
                 mem_limit=self.memory_limit,
                 memswap_limit=self.memory_limit,
                 nano_cpus=2_000_000_000,
                 tmpfs={
-                    "/workspace": (
-                        "rw,noexec,nosuid,nodev,size=768m,"
-                        "uid=10001,gid=10001,mode=0700"
-                    )
+                    "/workspace": "rw,noexec,nosuid,nodev,size=768m,uid=0,gid=0,mode=0755",
+                    "/output": "rw,noexec,nosuid,nodev,size=16m,uid=0,gid=0,mode=0700",
                 },
                 labels={
                     "com.nakima.lab": "true",
