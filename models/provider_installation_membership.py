@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base
@@ -11,11 +11,14 @@ class ProviderInstallationMembership(Base):
 
     __tablename__ = "provider_installation_memberships"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_installation_membership_active_principal",
             "provider_installation_id",
             "principal_issuer",
             "principal_subject",
-            name="uq_installation_membership_principal",
+            unique=True,
+            postgresql_where=text("is_active = true"),
+            sqlite_where=text("is_active = 1"),
         ),
         CheckConstraint(
             "role IN ('owner', 'admin', 'maintainer', 'reviewer', 'viewer')",
@@ -27,7 +30,8 @@ class ProviderInstallationMembership(Base):
         ),
         CheckConstraint(
             "is_active = true OR (revoked_at IS NOT NULL AND "
-            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL)",
+            "revoked_by_issuer IS NOT NULL AND revoked_by_subject IS NOT NULL "
+            "AND revocation_reason IS NOT NULL)",
             name="ck_installation_membership_revocation_audit",
         ),
         Index(
@@ -56,6 +60,7 @@ class ProviderInstallationMembership(Base):
     )
     revoked_by_issuer: Mapped[str | None] = mapped_column(String(512), nullable=True)
     revoked_by_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    revocation_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
