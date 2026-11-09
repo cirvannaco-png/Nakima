@@ -28,6 +28,7 @@ class Repository(Base):
             name="ck_repositories_lab_consent_complete",
         ),
         Index("ix_repositories_provider_installation_id", "provider_installation_id"),
+        Index("uq_repositories_github_repo_id", "github_repo_id", unique=True),
         UniqueConstraint("id", "provider_installation_id", name="uq_repositories_id_installation"),
     )
 
