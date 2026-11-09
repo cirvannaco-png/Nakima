@@ -136,7 +136,9 @@ class ModelCandidateFix(Base):
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     candidate_diff: Mapped[str] = mapped_column(Text, nullable=False)
-    candidate_status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed", server_default="proposed")
+    candidate_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="proposed", server_default="proposed"
+    )
     test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
