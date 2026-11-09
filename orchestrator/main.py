@@ -246,9 +246,7 @@ async def review_sandbox_run(
     principal: LabPrincipal = Depends(get_current_lab_principal),
     session: AsyncSession = Depends(get_db),
 ):
-    result = await session.execute(
-        select(SandboxRun).where(SandboxRun.id == run_id).with_for_update()
-    )
+    result = await session.execute(select(SandboxRun).where(SandboxRun.id == run_id).with_for_update())
     run = result.scalar_one_or_none()
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
