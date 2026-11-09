@@ -61,6 +61,17 @@ class Settings(BaseSettings):
     SCAN_ON_PR: bool = True
     SECRET_DETECTION: bool = True
 
+    # Optional OIDC identity provider for Nakima Lab. The Lab remains
+    # unconfigured and unavailable until all three values are supplied.
+    LAB_OIDC_ISSUER: str | None = None
+    LAB_OIDC_AUDIENCE: str | None = None
+    LAB_OIDC_JWKS_URL: str | None = None
+    # Comma-separated, immutable OIDC subject IDs allowed to administer Lab
+    # installation memberships. Email addresses are deliberately not used.
+    LAB_OIDC_ADMIN_SUBJECTS: str = ""
+    LAB_OIDC_JWKS_CACHE_SECONDS: int = 300
+    LAB_OIDC_CLOCK_SKEW_SECONDS: int = 30
+
     # NEIS (neis/analyzers/tech_scout.py) — outbound calls to PyPI/npm to
     # check current upstream versions. Short timeout + low retry count on
     # purpose: a slow/unreachable registry should degrade one package's
@@ -194,6 +205,17 @@ def preflight(s: "Settings | None" = None) -> list[str]:
             "GitHub App not configured — webhook endpoints will reject requests. "
             "Set GITHUB_APP_ID/GITHUB_PRIVATE_KEY/GITHUB_WEBHOOK_SECRET to enable."
         )
+
+    oidc_bits = [s.LAB_OIDC_ISSUER, s.LAB_OIDC_AUDIENCE, s.LAB_OIDC_JWKS_URL]
+    if any(oidc_bits) and not all(oidc_bits):
+        warnings.append(
+            "Lab OIDC is partially configured; Lab authentication will remain unavailable "
+            "until LAB_OIDC_ISSUER, LAB_OIDC_AUDIENCE, and LAB_OIDC_JWKS_URL are all set."
+        )
+    if s.LAB_OIDC_JWKS_CACHE_SECONDS < 30 or s.LAB_OIDC_JWKS_CACHE_SECONDS > 3600:
+        errors.append("LAB_OIDC_JWKS_CACHE_SECONDS must be between 30 and 3600.")
+    if s.LAB_OIDC_CLOCK_SKEW_SECONDS < 0 or s.LAB_OIDC_CLOCK_SKEW_SECONDS > 120:
+        errors.append("LAB_OIDC_CLOCK_SKEW_SECONDS must be between 0 and 120.")
 
     if s.ENVIRONMENT == "production":
         # Only validate DB_PASSWORD when DATABASE_URL was built from individual
