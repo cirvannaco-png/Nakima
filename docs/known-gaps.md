@@ -9,10 +9,12 @@ real vs. stubbed right now.
 
 - Migration `0013` adds a provider-neutral `provider_installations` table and links the existing integer-keyed `repositories` rows to an internal installation ID. External provider IDs are stored as strings and uniquely scoped by provider.
 - Legacy repositories remain unattached and Lab-opted-out. A database CHECK constraint requires an installation, consent timestamp, actor identifier, and consent version before opt-in.
-- Migration `0014` now defines `sandbox_runs`, `run_reviews`, and
-  `model_candidate_fixes` against the canonical integer repository ID.
-  These tables are not yet wired into the orchestrator, and verified webhook
-  metadata is not yet upserted into provider-installation rows.
+- Migration `0014` defines `sandbox_runs`, `run_reviews`, and
+  `model_candidate_fixes`. Every run carries the canonical repository ID and
+  provider-installation ID under a composite FK; PostgreSQL enforces synthetic
+  injection consent with a trigger. The tables are not yet wired into the
+  orchestrator, and verified webhook metadata is not yet upserted into
+  provider-installation rows.
 - `db/schema.sql` was a separate UUID-based draft, not an Alembic migration and not part of ORM metadata. It is now marked deprecated/non-executable; do not apply it. The integer `repositories.id` remains canonical.
 
 ## Stubbed, needs implementation before first live test
