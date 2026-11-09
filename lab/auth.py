@@ -75,7 +75,13 @@ class OIDCVerifier:
             or parsed.fragment
         ):
             raise LabOIDCNotConfigured("The configured OIDC JWKS endpoint is invalid")
-        if issuer_parsed.username or issuer_parsed.password or not issuer_parsed.hostname or issuer_parsed.query or issuer_parsed.fragment:
+        if (
+            issuer_parsed.username
+            or issuer_parsed.password
+            or not issuer_parsed.hostname
+            or issuer_parsed.query
+            or issuer_parsed.fragment
+        ):
             raise LabOIDCNotConfigured("The configured OIDC issuer URL is invalid")
         return issuer, audience, jwks_url
 
