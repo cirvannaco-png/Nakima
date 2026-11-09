@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    func,
     String,
     Text,
 )
@@ -44,11 +45,11 @@ class SandboxRun(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
     trigger: Mapped[str] = mapped_column(String(32), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", server_default="queued")
     source_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
     container_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     container_image: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    network_isolated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     synthetic_injection_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     result_schema_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     diagnosis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -67,6 +68,7 @@ class SandboxRun(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
+        server_default=func.now(),
     )
 
     repository = relationship("Repository")
@@ -93,6 +95,7 @@ class RunReview(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
+        server_default=func.now(),
     )
 
     sandbox_run = relationship("SandboxRun", back_populates="reviews")
@@ -111,7 +114,7 @@ class ModelCandidateFix(Base):
             name="ck_model_candidate_fixes_tested_has_result",
         ),
         CheckConstraint(
-            "candidate_status != 'selected' OR test_suite_passed = true",
+            "candidate_status != 'selected' OR test_suite_passed IS TRUE",
             name="ck_model_candidate_fixes_selected_passed",
         ),
     )
@@ -124,7 +127,7 @@ class ModelCandidateFix(Base):
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     candidate_diff: Mapped[str] = mapped_column(Text, nullable=False)
-    candidate_status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed")
+    candidate_status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed", server_default="proposed")
     test_suite_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
