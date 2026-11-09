@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -52,17 +53,32 @@ def test_webhook_ignores_irrelevant_events():
     assert r.json()["status"] == "ignored"
 
 
-def test_webhook_valid_signature_reaches_auth_and_fails_cleanly():
-    # installation 42 isn't a real registered GitHub App installation, so
-    # this exercises the full pipeline (signature -> parse -> auth attempt)
-    # and confirms an auth failure returns a clean 502, not a raw 500 with
-    # a stack trace on a public endpoint.
+def test_webhook_rejects_repository_without_active_installation_before_auth(monkeypatch):
+    from githubapp import app as github_app_module
+
+    class _SessionContext:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def begin(self):
+            return self
+
+    monkeypatch.setattr(github_app_module, "AsyncSessionLocal", _SessionContext)
+    monkeypatch.setattr(
+        github_app_module,
+        "require_active_github_repository_installation",
+        AsyncMock(side_effect=ValueError("installation is not registered")),
+    )
+
     client = _client()
     body = json.dumps(
         {
             "action": "opened",
             "installation": {"id": 42},
-            "repository": {"full_name": "k/r"},
+            "repository": {"id": 101, "full_name": "k/r"},
             "issue": {"title": "x", "body": "y", "number": 1},
         }
     ).encode()
@@ -72,5 +88,5 @@ def test_webhook_valid_signature_reaches_auth_and_fails_cleanly():
         content=body,
         headers={"X-Hub-Signature-256": sig, "X-GitHub-Event": "issues", "Content-Type": "application/json"},
     )
-    assert r.status_code == 502
-    assert "Could not authenticate" in r.json()["detail"]
+    assert r.status_code == 403
+    assert "not registered to an active" in r.json()["detail"]
