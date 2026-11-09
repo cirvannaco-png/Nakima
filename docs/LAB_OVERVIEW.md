@@ -30,14 +30,11 @@ The existing application schema is authoritative:
   to opted out. A database CHECK constraint prevents opt-in unless the
   installation, timestamp, actor, and consent-version are all present.
 
-Migrations `0013` and `0014` add the provider tenant, consent, durable run,
-candidate, and review schema. Every run stores both the canonical repository
-ID and its provider-installation ID; a composite foreign key prevents a run
-from being attributed to a different installation. Synthetic-injection runs
-are additionally checked by a PostgreSQL trigger against the repository's
-complete opt-in record. The old `db/schema.sql` UUID-based repository schema
-was never part of the Alembic chain and is now explicitly marked deprecated
-and non-executable. Do not apply it.
+Migration `0013` adds only the provider-neutral installation and repository
+consent foundation. Durable run, candidate, and review tables are a separate
+next step and are not in the migration chain yet. The old `db/schema.sql`
+UUID-based repository schema was never part of the Alembic chain and is now
+explicitly marked deprecated and non-executable. Do not apply it.
 
 ## Target lifecycle (not yet implemented end to end)
 
